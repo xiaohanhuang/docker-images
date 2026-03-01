@@ -1,0 +1,138 @@
+name: Publish Docker Images to ECR
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "projects/**"
+      - ".github/workflows/publish-images-to-ecr.yml"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: publish-images-to-ecr
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-west-2
+  # Update these to your AWS account / ECR registry.
+  AWS_ROLE_ARN: arn:aws:iam::805673386114:role/github-actions-ecr-push-ml-platform-eks
+  ECR_REGISTRY: 805673386114.dkr.ecr.us-west-2.amazonaws.com
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build order matters for images that use other images as a base.
+      - name: Build and push base-gpu
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/components/images/base-gpu/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/base-gpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/base-gpu:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push ray-worker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/ray/images/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/base-gpu:latest
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push training-llm
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/components/images/training-llm/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:latest
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/training-llm:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/training-llm:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push notebook-cpu
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/jupyter/images/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push gpu-idle-monitor
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/jupyter/gpu-idle-monitor/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/gpu-idle-monitor:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/gpu-idle-monitor:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push spark-base
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/spark/images/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/spark-base:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/spark-base:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push text2sql-serve
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/workflows/text2sql/serve/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/text2sql-serve:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/text2sql-serve:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
