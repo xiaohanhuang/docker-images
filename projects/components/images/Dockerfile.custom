@@ -1,0 +1,85 @@
+FROM nvidia/cuda:12.9.1-devel-ubuntu22.04
+
+USER root
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies and Python 3.12
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    curl \
+    git \
+    sudo \
+    vim \
+    htop \
+    screen \
+    wget \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install pip for Python 3.12
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12
+
+# Set python3.12 as default
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
+
+# Create jovyan user (standard for Jupyter)
+ARG NB_USER="jovyan"
+ARG NB_UID="1000"
+ARG NB_GID="100"
+RUN useradd -m -s /bin/bash -N -u $NB_UID $NB_USER && \
+    mkdir -p /home/$NB_USER/work && \
+    chown -R $NB_USER:$NB_GID /home/$NB_USER && \
+    mkdir -p /opt/venv && \
+    chown $NB_UID:$NB_GID /opt/venv
+
+# Switch to user
+USER $NB_USER
+WORKDIR /home/$NB_USER
+# Create virtual environment in /opt to persist across PVC mounts
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3.12 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Fix permissions
+RUN chown -R $NB_USER:$NB_GID $VIRTUAL_ENV
+
+# Copy local SDK
+COPY --chown=$NB_UID:$NB_GID projects/components/sdk /tmp/sdk
+
+# Debug: verify required files exist
+RUN ls -la /tmp/sdk && test -f /tmp/sdk/pyproject.toml && test -f /tmp/sdk/README.md
+
+# Upgrade pip and build tools
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel build
+
+# Pre-install SDK dependencies (to isolate failure)
+RUN pip install --no-cache-dir flytekit mlflow boto3
+
+# Install SDK in editable mode for debugging (or standard install)
+# Using -v to get more details on failure
+RUN pip install --no-cache-dir -v /tmp/sdk
+
+# Install Jupyter and ML ecosystem
+# Note: Installing vllm might take a while to compile if wheels aren't pre-built for this specific CUDA version,
+# but usually it finds compatible wheels.
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    jupyterhub \
+    jupyterlab \
+    "vllm>=0.15" \
+    "torch>=2.9" \
+    flytekit \
+    mlflow \
+    boto3
+
+# Expose port
+EXPOSE 8888
+
+# Default command
+CMD ["/opt/venv/bin/jupyterhub-singleuser"]

@@ -1,0 +1,26 @@
+# Core ML
+torch==2.3.1           # Stable 2.x
+transformers==4.41.2    # Standard stable version
+datasets==2.21.0
+peft==0.11.1
+accelerate==0.31.0
+
+# Distributed & Orchestration
+ray[default]==2.30.0   # Stable 2.x
+flytekit==1.13.0
+flytekitplugins-ray==1.13.0
+mlflow==2.14.0
+
+# Shared lower-level deps (Anti-Conflict Pins)
+pydantic==2.7.4
+pyarrow==15.0.0
+fsspec==2024.6.1
+adlfs==2024.4.1
+gcsfs>=2024.6.0        # Force newer version compatible with fsspec 2024.6.1
+s3fs>=2024.6.0         # Force newer version compatible with fsspec 2024.6.1
+
+# Data & Utils
+boto3<1.35.0
+nvitop
+jupyterlab-git
+ipywidgets

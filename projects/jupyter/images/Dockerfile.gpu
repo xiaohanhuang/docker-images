@@ -1,0 +1,39 @@
+# GPU-enabled notebook image for the ML Platform
+# Bases on quay.io/jupyter/pytorch-notebook which already has:
+#   - CUDA runtime, cuDNN, PyTorch, JupyterLab
+# We add Flyte/Ray/MLflow on top.
+FROM quay.io/jupyter/pytorch-notebook:python-3.11
+
+USER root
+
+# Install system deps needed by some Python packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    vim \
+    htop \
+    screen \
+    && rm -rf /var/lib/apt/lists/*
+
+USER ${NB_UID}
+
+# Install platform packages
+COPY requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir \
+    flytekit==1.13.0 \
+    flytekitplugins-ray==1.13.0 \
+    "ray[default]==2.30.0" \
+    mlflow==2.14.0 \
+    transformers==4.41.2 \
+    datasets==2.21.0 \
+    peft==0.11.1 \
+    accelerate==0.31.0 \
+    nvitop \
+    jupyterlab-git \
+    ipywidgets \
+    torch-tb-profiler
+
+# Platform SDK
+COPY --chown=${NB_UID}:${NB_GID} ../../components/sdk /opt/ml-platform-sdk/
+RUN pip install --no-cache-dir -e /opt/ml-platform-sdk/
+
+# Expose notebook port (inherited, but explicit for clarity)
+EXPOSE 8888
