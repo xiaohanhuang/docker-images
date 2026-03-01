@@ -29,20 +29,52 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Detect image context changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            base_gpu:
+              - 'projects/components/images/base-gpu/**'
+            ray_worker:
+              - 'projects/ray/images/**'
+              - 'projects/components/images/base-gpu/**'
+            training_llm:
+              - 'projects/components/images/training-llm/**'
+              - 'projects/ray/images/**'
+              - 'projects/components/images/base-gpu/**'
+            notebook_cpu:
+              - 'projects/jupyter/images/**'
+              - 'projects/components/sdk/**'
+            gpu_idle_monitor:
+              - 'projects/jupyter/gpu-idle-monitor/**'
+            spark_base:
+              - 'projects/spark/images/**'
+            text2sql_serve:
+              - 'projects/workflows/text2sql/serve/**'
+
+      - name: No image changes
+        if: steps.changes.outputs.changes == '[]'
+        run: echo "No relevant Docker context changes; skipping."
+
       - name: Configure AWS credentials (OIDC)
+        if: steps.changes.outputs.changes != '[]'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
+        if: steps.changes.outputs.changes != '[]'
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
+        if: steps.changes.outputs.changes != '[]'
         uses: docker/setup-buildx-action@v3
 
       # Build order matters for images that use other images as a base.
       - name: Build and push base-gpu
+        if: steps.changes.outputs.base_gpu == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -56,6 +88,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push ray-worker
+        if: steps.changes.outputs.ray_worker == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -71,6 +104,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push training-llm
+        if: steps.changes.outputs.training_llm == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -86,6 +120,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push notebook-cpu
+        if: steps.changes.outputs.notebook_cpu == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -99,6 +134,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push gpu-idle-monitor
+        if: steps.changes.outputs.gpu_idle_monitor == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -112,6 +148,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push spark-base
+        if: steps.changes.outputs.spark_base == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -125,6 +162,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push text2sql-serve
+        if: steps.changes.outputs.text2sql_serve == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
