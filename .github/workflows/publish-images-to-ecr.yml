@@ -182,7 +182,7 @@ jobs:
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.gpu_idle_monitor == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: projects/jupyter/gpu-idle-monitor
           file: projects/jupyter/gpu-idle-monitor/Dockerfile
           platforms: linux/amd64
           push: true
