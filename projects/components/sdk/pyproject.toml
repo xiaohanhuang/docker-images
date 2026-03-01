@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml-platform-sdk"
+version = "0.1.0"
+description = "SDK for ML Platform tasks"
+dependencies = [
+    "flytekit",
+    "mlflow",
+    "boto3",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
