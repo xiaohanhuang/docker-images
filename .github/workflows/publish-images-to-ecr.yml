@@ -148,6 +148,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push training-llm
+        continue-on-error: true
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.training_llm == 'true'
         uses: docker/build-push-action@v6
         with:
