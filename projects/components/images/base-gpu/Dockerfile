@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.9.1-cudnn9-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
@@ -6,9 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3.10 \
-    python3-pip \
-    python3-venv \
+    software-properties-common \
     git \
     wget \
     curl \
@@ -17,6 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     htop \
     screen \
     vim \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    python3.12-dev \
+    && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12 \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure SSH for debugging (In prod, use non-root and properly managed keys)
@@ -30,10 +35,11 @@ RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so
 EXPOSE 22
 
 # Symlink python3 to python
-RUN ln -s /usr/bin/python3.10 /usr/bin/python
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
 
 # Install PyTorch (matching CUDA version)
-RUN pip install --no-cache-dir torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu121
+RUN pip install --no-cache-dir torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu129
 
 # Verify install
 RUN python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
