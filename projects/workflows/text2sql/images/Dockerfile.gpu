@@ -24,6 +24,14 @@ RUN pip install --no-cache-dir \
     "protobuf" \
     "requests"
 
+# KubeRay starts Ray nodes via: /bin/bash -c "ulimit -n 65536; ray start --head ..."
+# Non-interactive bash does not source conda init scripts, so pip-installed
+# binaries may not be in PATH. Symlink ray into /usr/local/bin to guarantee it
+# is found regardless of which Python environment is active.
+RUN RAY_BIN=$(python3 -c "import shutil; print(shutil.which('ray') or '')") && \
+    [ -n "$RAY_BIN" ] && ln -sf "$RAY_BIN" /usr/local/bin/ray || \
+    (find /opt /usr -name ray -type f 2>/dev/null | head -1 | xargs -I{} ln -sf {} /usr/local/bin/ray)
+
 # Copy workflow source
 COPY config.py      /app/config.py
 COPY tasks/         /app/tasks/

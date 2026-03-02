@@ -40,6 +40,8 @@ jobs:
       gpu_idle_monitor: ${{ steps.changes.outputs.gpu_idle_monitor }}
       spark_base: ${{ steps.changes.outputs.spark_base }}
       text2sql_serve: ${{ steps.changes.outputs.text2sql_serve }}
+      workflow_cpu: ${{ steps.changes.outputs.workflow_cpu }}
+      workflow_gpu: ${{ steps.changes.outputs.workflow_gpu }}
 
     steps:
       - uses: actions/checkout@v4
@@ -83,6 +85,16 @@ jobs:
               - 'projects/spark/images/**'
             text2sql_serve:
               - 'projects/workflows/text2sql/serve/**'
+            workflow_cpu:
+              - 'projects/workflows/text2sql/images/Dockerfile.cpu'
+              - 'projects/workflows/text2sql/config.py'
+              - 'projects/workflows/text2sql/tasks/**'
+              - 'projects/workflows/text2sql/pipeline.py'
+            workflow_gpu:
+              - 'projects/workflows/text2sql/images/Dockerfile.gpu'
+              - 'projects/workflows/text2sql/config.py'
+              - 'projects/workflows/text2sql/tasks/**'
+              - 'projects/workflows/text2sql/pipeline.py'
 
   skip:
     runs-on: ubuntu-latest
@@ -217,5 +229,33 @@ jobs:
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/text2sql-serve:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/text2sql-serve:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push workflow-cpu
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.workflow_cpu == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/workflows/text2sql
+          file: projects/workflows/text2sql/images/Dockerfile.cpu
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/workflow-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/workflow-cpu:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push workflow-gpu
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.workflow_gpu == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/workflows/text2sql
+          file: projects/workflows/text2sql/images/Dockerfile.gpu
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/workflow-gpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/workflow-gpu:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
