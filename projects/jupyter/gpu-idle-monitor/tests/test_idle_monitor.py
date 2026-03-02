@@ -42,7 +42,9 @@ class TestGetJupyterActivity:
 
     def test_busy_kernel_returns_true(self):
         with patch("requests.get") as mock_get:
-            mock_get.return_value = self._resp([{"id": "k1", "execution_state": "busy"}])
+            mock_get.return_value = self._resp(
+                [{"id": "k1", "execution_state": "busy"}]
+            )
             assert idle_monitor.get_jupyter_activity("tok") is True
 
     def test_idle_kernel_no_terminals_returns_false(self):
