@@ -2,7 +2,7 @@
 # Bases on quay.io/jupyter/pytorch-notebook which already has:
 #   - CUDA runtime, cuDNN, PyTorch, JupyterLab
 # We add Flyte/Ray/MLflow on top.
-FROM quay.io/jupyter/pytorch-notebook:python-3.11
+FROM quay.io/jupyter/pytorch-notebook:python-3.12
 
 USER root
 
