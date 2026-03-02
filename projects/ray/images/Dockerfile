@@ -4,7 +4,7 @@ FROM ${BASE_IMAGE}
 # Install Ray and common ML libs
 # ray[default] includes dashboard, client, etc.
 RUN pip install --no-cache-dir \
-    "ray[default]==2.9.0" \
+    "ray[default]==2.54.0" \
     pandas \
     numpy \
     pyarrow \

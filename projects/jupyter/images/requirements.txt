@@ -6,7 +6,7 @@ peft==0.11.1
 accelerate==0.31.0
 
 # Distributed & Orchestration
-ray[default]==2.30.0   # Stable 2.x
+ray[default]==2.54.0   # Stable 2.x
 flytekit==1.13.0
 flytekitplugins-ray==1.13.0
 mlflow==2.14.0
