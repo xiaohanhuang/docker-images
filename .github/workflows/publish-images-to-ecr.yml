@@ -210,7 +210,7 @@ jobs:
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.text2sql_serve == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: projects/workflows/text2sql/serve
           file: projects/workflows/text2sql/serve/Dockerfile
           platforms: linux/amd64
           push: true
