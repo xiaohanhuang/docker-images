@@ -7,14 +7,18 @@ Usage:
   GET  /health
   GET  /model_info
 """
-import os, boto3, tempfile
+
+import os
+import tempfile
+
+import boto3
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, pipeline
-import uvicorn
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline
 
-S3_BUCKET    = os.environ["S3_BUCKET"]
-RUN_ID       = os.environ["MODEL_RUN_ID"]
+S3_BUCKET = os.environ["S3_BUCKET"]
+RUN_ID = os.environ["MODEL_RUN_ID"]
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "128"))
 
 app = FastAPI(
@@ -29,17 +33,19 @@ _s3 = boto3.client("s3")
 _ckpt_dir = tempfile.mkdtemp()
 
 paginator = _s3.get_paginator("list_objects_v2")
-for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"text2sql/checkpoints/{RUN_ID}/"):
+for page in paginator.paginate(
+    Bucket=S3_BUCKET, Prefix=f"text2sql/checkpoints/{RUN_ID}/"
+):
     for obj in page.get("Contents", []):
-        key   = obj["Key"]
+        key = obj["Key"]
         fname = key.split("/")[-1]
-        body  = _s3.get_object(Bucket=S3_BUCKET, Key=key)["Body"].read()
+        body = _s3.get_object(Bucket=S3_BUCKET, Key=key)["Body"].read()
         with open(f"{_ckpt_dir}/{fname}", "wb") as f:
             f.write(body)
 
 _tokenizer = AutoTokenizer.from_pretrained(_ckpt_dir)
-_model     = AutoModelForSeq2SeqLM.from_pretrained(_ckpt_dir)
-_pipe      = pipeline(
+_model = AutoModelForSeq2SeqLM.from_pretrained(_ckpt_dir)
+_pipe = pipeline(
     "text2text-generation",
     model=_model,
     tokenizer=_tokenizer,
@@ -52,7 +58,8 @@ print("✅ Model loaded and ready")
 # ── Schemas ───────────────────────────────────────────────────────────
 class PredictRequest(BaseModel):
     question: str
-    context: str      # CREATE TABLE statements
+    context: str  # CREATE TABLE statements
+
 
 class PredictResponse(BaseModel):
     sql: str
@@ -79,7 +86,9 @@ def predict(req: PredictRequest):
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="question cannot be empty")
     if not req.context.strip():
-        raise HTTPException(status_code=400, detail="context (CREATE TABLE) cannot be empty")
+        raise HTTPException(
+            status_code=400, detail="context (CREATE TABLE) cannot be empty"
+        )
 
     prompt = f"translate English to SQL: {req.question} </s> Tables: {req.context}"
     output = _pipe(prompt)[0]["generated_text"].strip()
