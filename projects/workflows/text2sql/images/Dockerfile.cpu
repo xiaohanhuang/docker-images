@@ -8,9 +8,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages
+# Pin transformers + tokenizers to known-compatible versions to avoid
+# Rust tokenizer ABI mismatches (TypeError in add_tokens).
 RUN pip install --no-cache-dir \
     "datasets>=2.16" \
-    "transformers>=4.41" \
+    "transformers==4.46.3" \
+    "tokenizers==0.20.3" \
     "flytekit>=1.13" \
     "flytekitplugins-ray>=1.13" \
     "mlflow>=2.14" \
