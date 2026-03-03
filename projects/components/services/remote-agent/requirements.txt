@@ -1,0 +1,4 @@
+cloudpickle>=3.0
+fastapi>=0.104
+uvicorn[standard]>=0.24
+kubernetes>=28.0
