@@ -8,3 +8,4 @@ projects/ray/images
 projects/spark/images
 projects/workflows/text2sql/images
 projects/workflows/text2sql/serve
+projects/components/services/remote-agent
