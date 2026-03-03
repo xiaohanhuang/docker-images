@@ -83,7 +83,7 @@ def preprocess(raw_s3_path: str) -> str:
 
     # ── Tokenise ──────────────────────────────────────────────────────
     print(f"🔤 Loading tokenizer: {BASE_MODEL}")
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=False)
 
     hf_dataset = Dataset.from_pandas(df[["input_text", "target_text"]])
 
