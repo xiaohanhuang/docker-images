@@ -73,6 +73,16 @@ def main():
     kwargs = payload["kwargs"]
     config = payload["config"]
 
+    # 2. Install user-specified packages
+    packages = config.get("packages", [])
+    if packages:
+        print(f"[REMOTE] Installing packages: {', '.join(packages)}")
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "-q",
+             "--root-user-action=ignore"] + list(packages)
+        )
+        print(f"[REMOTE] Packages installed successfully")
+
     print(f"[REMOTE] Executing {fn.__name__}(...)")
     print(f"[REMOTE] Args: {len(args)} positional, {len(kwargs)} keyword")
     print(f"[REMOTE] Config: GPU={config['gpu']}, Memory={config['memory']}, CPU={config['cpu']}")
@@ -477,4 +487,3 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8080"))
     print(f"[agent] Starting ML Platform Remote Execution Agent on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
-
