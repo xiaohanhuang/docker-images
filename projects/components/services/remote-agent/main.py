@@ -52,7 +52,10 @@ try:
     import cloudpickle
 except ImportError:
     print("[REMOTE] Installing cloudpickle...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "cloudpickle"])
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "-q",
+         "--root-user-action=ignore", "cloudpickle"]
+    )
     import cloudpickle
 
 import os
@@ -259,12 +262,17 @@ def _create_execution_job(
             )
         )
 
-    # Determine image
-    image = config.get("image") or "ml-platform/base-gpu:latest"
+    # Determine image - use lighter CPU image when no GPU requested
+    if config.get("gpu", 0) > 0:
+        default_image = "ml-platform/base-gpu:latest"
+    else:
+        default_image = "python:3.12-slim"
+    image = config.get("image") or default_image
     ecr_registry = os.getenv(
         "ECR_REGISTRY", "805673386114.dkr.ecr.us-west-2.amazonaws.com"
     )
-    if "/" not in image or image.startswith("ml-platform/"):
+    # Only prefix with ECR for ml-platform images, not public images like python:3.12-slim
+    if image.startswith("ml-platform/"):
         image = f"{ecr_registry}/{image}"
 
     # Build environment variables
