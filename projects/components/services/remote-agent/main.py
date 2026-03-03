@@ -276,12 +276,12 @@ def _create_execution_job(
     if config.get("gpu", 0) > 0:
         default_image = "ml-platform/base-gpu:latest"
     else:
-        default_image = "python:3.12-slim"
+        default_image = "ml-platform/base-cpu:latest"
     image = config.get("image") or default_image
     ecr_registry = os.getenv(
         "ECR_REGISTRY", "805673386114.dkr.ecr.us-west-2.amazonaws.com"
     )
-    # Only prefix with ECR for ml-platform images, not public images like python:3.12-slim
+    # Prefix all ml-platform images with ECR registry
     if image.startswith("ml-platform/"):
         image = f"{ecr_registry}/{image}"
 
