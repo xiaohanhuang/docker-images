@@ -130,7 +130,9 @@ def train(
     print("Loading val split...")
     val_ds = load_split("val")
 
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+    # use_fast=False avoids Rust tokenizer version mismatches with the
+    # RoBERTa-based CodeT5+ tokenizer.
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, use_fast=False)
     model = AutoModelForSeq2SeqLM.from_pretrained(BASE_MODEL)
 
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model, padding=True)
@@ -175,11 +177,13 @@ def train(
         ckpt_dirs = [
             d
             for d in os.listdir(checkpoint_dir)
-            if d.startswith("checkpoint-") and os.path.isdir(os.path.join(checkpoint_dir, d))
+            if d.startswith("checkpoint-")
+            and os.path.isdir(os.path.join(checkpoint_dir, d))
         ]
         if ckpt_dirs:
             resume_ckpt = os.path.join(
-                checkpoint_dir, sorted(ckpt_dirs, key=lambda x: int(x.split("-")[-1]))[-1]
+                checkpoint_dir,
+                sorted(ckpt_dirs, key=lambda x: int(x.split("-")[-1]))[-1],
             )
             print(f"Resuming from checkpoint: {resume_ckpt}")
 
