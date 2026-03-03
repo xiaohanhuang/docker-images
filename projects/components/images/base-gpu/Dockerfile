@@ -41,5 +41,8 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
 # Install PyTorch (matching CUDA version)
 RUN pip install --no-cache-dir torch==2.9.0 torchvision==0.24.0 torchaudio==2.9.0 --index-url https://download.pytorch.org/whl/cu129
 
+# Install cloudpickle for @remote decorator support
+RUN pip install --no-cache-dir cloudpickle
+
 # Verify install
 RUN python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
