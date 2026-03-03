@@ -28,7 +28,8 @@ except config.ConfigException:
         config.load_kube_config()
         print("[agent] Running locally, loaded kubeconfig")
     except config.ConfigException as e:
-        print(f"[agent] ⚠️  Could not load Kubernetes config: {e}")
+        print(f"[agent] ❌ Could not load Kubernetes config: {e}")
+        raise SystemExit("[agent] Failed to load Kubernetes config, exiting") from e
 
 # Initialize Kubernetes clients
 batch_v1 = client.BatchV1Api()
@@ -43,10 +44,19 @@ app = FastAPI(
 
 # Execution runner script that runs inside the GPU pod
 EXECUTION_RUNNER_SCRIPT = """
-import os
+import subprocess
 import sys
+
+# Ensure cloudpickle is available in the execution environment
+try:
+    import cloudpickle
+except ImportError:
+    print("[REMOTE] Installing cloudpickle...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "cloudpickle"])
+    import cloudpickle
+
+import os
 import base64
-import cloudpickle
 import traceback
 
 def main():
@@ -111,6 +121,19 @@ async def health():
 async def execute_remote(request: Request):
     """
     Execute a serialized function on a GPU pod.
+
+    ⚠️  SECURITY WARNING (Phase 1 MVP):
+    This endpoint accepts arbitrary cloudpickle payloads and executes them with cluster
+    privileges. This is a remote code execution (RCE) vulnerability by design for Phase 1.
+
+    Production deployment MUST implement:
+    1. Authentication (API tokens, mTLS, or OAuth)
+    2. Authorization (per-user RBAC for job creation)
+    3. NetworkPolicy to restrict access to trusted clients only
+    4. Consider: move deserialization into execution pods (not agent process)
+
+    For now, this service should ONLY be exposed via port-forward for local dev,
+    or restricted to specific source IPs/namespaces via NetworkPolicy.
 
     Request body: cloudpickle-serialized dict with:
     - fn: function to execute
@@ -337,38 +360,65 @@ async def _wait_for_pod(
 
 
 async def _stream_pod_logs(pod_name: str, namespace: str):
-    """Stream logs from a pod with retries."""
-    log_deadline = time.time() + 300  # Wait up to 5 min for logs
+    """Stream logs from a pod with retries and continuous following."""
+    log_deadline = time.time() + 300  # Wait up to 5 min for logs to start
 
-    # Wait for pod to be running first
+    # Wait for pod to be running or finished
     while time.time() < log_deadline:
         try:
             pod = core_v1.read_namespaced_pod(name=pod_name, namespace=namespace)
-            if pod.status.phase == "Running":
-                break
-            if pod.status.phase in ["Succeeded", "Failed"]:
-                # Pod finished before we could stream, get all logs
+            if pod.status.phase in ["Running", "Succeeded", "Failed"]:
                 break
         except Exception as e:
             print(f"[agent] Error reading pod status: {e}")
 
         await asyncio.sleep(2)
 
-    # Stream logs with retries
+    # Try to stream logs with retries
     while time.time() < log_deadline:
         try:
-            logs = core_v1.read_namespaced_pod_log(
-                name=pod_name,
-                namespace=namespace,
-                follow=False,
-            )
+            # First check if pod is in a terminal state
+            pod = core_v1.read_namespaced_pod(name=pod_name, namespace=namespace)
 
-            for line in logs.split("\n"):
-                if line:
-                    yield line + "\n"
-                    await asyncio.sleep(0)  # Yield control to event loop
+            # If pod finished, just get all logs once
+            if pod.status.phase in ["Succeeded", "Failed"]:
+                logs = core_v1.read_namespaced_pod_log(
+                    name=pod_name,
+                    namespace=namespace,
+                    follow=False,
+                )
+                for line in logs.split("\n"):
+                    if line:
+                        yield line + "\n"
+                        await asyncio.sleep(0)
+                return
 
-            return
+            # Pod is running, stream with follow=True using watch
+            # Use watch to stream logs in real-time
+            from kubernetes import watch
+
+            w = watch.Watch()
+            try:
+                for log_line in w.stream(
+                    core_v1.read_namespaced_pod_log,
+                    name=pod_name,
+                    namespace=namespace,
+                    follow=True,
+                    _preload_content=False,
+                    timestamps=False,
+                ):
+                    if log_line:
+                        yield (
+                            log_line + "\n" if not log_line.endswith("\n") else log_line
+                        )
+                        await asyncio.sleep(0)
+                w.stop()
+                return
+            except Exception as stream_err:
+                w.stop()
+                # If streaming fails, fall back to polling
+                print(f"[agent] Streaming failed, will retry: {stream_err}")
+                raise stream_err
 
         except ApiException as e:
             if e.status == 400:
@@ -379,9 +429,11 @@ async def _stream_pod_logs(pod_name: str, namespace: str):
             else:
                 yield f"[agent] Error streaming logs: {e}\n"
                 return
-        except Exception as e:
-            yield f"[agent] Error streaming logs: {e}\n"
-            return
+        except Exception:
+            # Retry on other errors (transient network issues, etc.)
+            await asyncio.sleep(2)
+            yield "[agent] Log stream interrupted, retrying...\n"
+            continue
 
     # Timeout waiting for logs
     yield "[agent] Timed out waiting for pod logs.\n"
