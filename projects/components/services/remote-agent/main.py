@@ -971,12 +971,82 @@ async def _ttl_eviction_task():
             print(f"[agent] Error in TTL eviction task: {e}")
 
 
+async def _reconcile_pool_on_startup():
+    """On startup, discover existing executor pods and recover or delete them.
+
+    After an agent restart the in-memory pod_pool is empty, but executor pods
+    may still be running on the cluster.  Without reconciliation those pods
+    become orphans: they hold CPU/memory forever and can never be evicted by
+    the TTL task (which only knows about pods registered in pod_pool).
+
+    Strategy:
+    - Running pod with a valid IP  → re-register as "idle" so the TTL task
+      can evict it normally and new requests can reuse it immediately.
+    - Any other phase (Pending, Failed, Unknown, no IP) → delete immediately
+      to reclaim resources.
+    """
+    namespace = os.getenv("NAMESPACE", "default")
+    label_selector = "app=remote-execution-pool,managed-by=remote-agent"
+
+    try:
+        pods = await asyncio.to_thread(
+            core_v1.list_namespaced_pod,
+            namespace=namespace,
+            label_selector=label_selector,
+        )
+    except Exception as e:
+        print(f"[agent] Startup reconcile: could not list pool pods: {e}")
+        return
+
+    recovered, deleted = 0, 0
+    for pod in pods.items:
+        name = pod.metadata.name
+        phase = getattr(pod.status, "phase", None)
+        ip = getattr(pod.status, "pod_ip", None)
+        config_hash = (pod.metadata.labels or {}).get("config-hash", "unknown")
+        created_ts = (
+            pod.metadata.creation_timestamp.isoformat()
+            if pod.metadata.creation_timestamp
+            else datetime.utcnow().isoformat()
+        )
+
+        if phase == "Running" and ip:
+            async with pool_lock:
+                pod_pool[name] = PodState(
+                    pod_name=name,
+                    status="idle",
+                    config_hash=config_hash,
+                    config={},  # minimal; enough for TTL eviction and hash-based reuse
+                    last_used=datetime.utcnow().isoformat(),
+                    created=created_ts,
+                    pod_ip=ip,
+                    namespace=namespace,
+                )
+            recovered += 1
+            print(f"[agent] Startup: re-registered pool pod {name} (hash={config_hash}, ip={ip})")
+        else:
+            try:
+                await asyncio.to_thread(
+                    core_v1.delete_namespaced_pod,
+                    name=name,
+                    namespace=namespace,
+                )
+                deleted += 1
+                print(f"[agent] Startup: deleted orphaned pod {name} (phase={phase})")
+            except Exception as e:
+                print(f"[agent] Startup: could not delete orphaned pod {name}: {e}")
+
+    if recovered or deleted:
+        print(f"[agent] Startup reconcile: {recovered} re-registered, {deleted} deleted")
+
+
 @app.on_event("startup")
 async def startup_event():
     """Start background tasks on application startup."""
     if POD_POOL_ENABLED:
         print(f"[agent] Pod Pool enabled with TTL={POD_POOL_TTL_SECONDS}s")
         asyncio.create_task(_ttl_eviction_task())
+        asyncio.create_task(_reconcile_pool_on_startup())
     else:
         print("[agent] Pod Pool disabled, using legacy one-shot Jobs")
 
