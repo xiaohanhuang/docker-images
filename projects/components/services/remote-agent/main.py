@@ -319,41 +319,14 @@ async def execute_remote(request: Request):
                 break
 
     # 5. If no matching pod found, create a new one
-    if not pod_name:
+    new_pod_needed = pod_name is None
+    execution_id = None  # only set when creating a new job (legacy mode)
+    if new_pod_needed:
         execution_id = f"remote-exec-{uuid.uuid4().hex[:8]}"
         print(f"[agent] Creating new pod: {execution_id}")
 
-        try:
-            if use_pool:
-                # Create long-lived pod with executor server
-                pod_name = await _create_executor_pod(
-                    execution_id=execution_id,
-                    config=config,
-                    namespace=namespace,
-                    config_hash=config_hash,
-                )
-                # Wait for pod to be ready and get IP
-                pod_ip = await _wait_for_pod_ready(pod_name, namespace, timeout=120)
-                if not pod_ip:
-                    return Response(
-                        content="Timeout waiting for pod to be ready",
-                        status_code=500,
-                    )
-                print(f"[agent] Pod ready with IP: {pod_ip}")
-
-                # Add to pool
-                async with pool_lock:
-                    pod_pool[pod_name] = PodState(
-                        pod_name=pod_name,
-                        status="busy",
-                        config_hash=config_hash,
-                        config=config,
-                        last_used=datetime.utcnow().isoformat(),
-                        created=datetime.utcnow().isoformat(),
-                        pod_ip=pod_ip,
-                        namespace=namespace,
-                    )
-            else:
+        if not use_pool:
+            try:
                 # Legacy mode: create one-shot Job
                 _create_execution_job(
                     execution_id=execution_id,
@@ -362,44 +335,103 @@ async def execute_remote(request: Request):
                     namespace=namespace,
                 )
                 print(f"[agent] Created Job: {execution_id}")
-        except Exception as e:
-            print(f"[agent] Failed to create pod/job: {e}")
-            return Response(
-                content=f"Failed to create execution pod: {e}",
-                status_code=500,
-            )
+            except Exception as e:
+                print(f"[agent] Failed to create job: {e}")
+                return Response(
+                    content=f"Failed to create execution job: {e}",
+                    status_code=500,
+                )
 
     # 6. Execute function
     if use_pool:
-        # Send payload to executor pod via HTTP
-        try:
-            result = await _execute_on_pod(
-                pod_ip=pod_ip,
-                payload_bytes=payload_bytes,
-                timeout=config.get("timeout", 3600),
-            )
+        # Pool mode: use StreamingResponse so the ALB/client connection stays alive
+        # while we wait for the pod to start (can take 60-120s on cold start).
+        _pod_name = pod_name
+        _pod_ip = pod_ip
+        _new_pod_needed = new_pod_needed
+        _execution_id = execution_id if new_pod_needed else None
 
-            # Mark pod as idle
-            async with pool_lock:
-                if pod_name in pod_pool:
-                    pod_pool[pod_name].status = "idle"
-                    pod_pool[pod_name].last_used = datetime.utcnow().isoformat()
+        async def pool_streamer():
+            nonlocal _pod_name, _pod_ip
 
-            # Return result
-            return Response(content=result, media_type="text/plain")
+            try:
+                if _new_pod_needed:
+                    # Create the executor pod
+                    try:
+                        _pod_name = await _create_executor_pod(
+                            execution_id=_execution_id,
+                            config=config,
+                            namespace=namespace,
+                            config_hash=config_hash,
+                        )
+                    except Exception as e:
+                        yield f"[agent] Failed to create pool pod: {e}\n".encode()
+                        return
 
-        except Exception as e:
-            print(f"[agent] Execution failed on pod {pod_name}: {e}")
+                    yield f"[agent] Pool pod {_pod_name} created, waiting for ready...\n".encode()
 
-            # Mark pod as idle (or delete if corrupted?)
-            async with pool_lock:
-                if pod_name in pod_pool:
-                    pod_pool[pod_name].status = "idle"
+                    # Wait for pod ready, streaming heartbeats every 5s
+                    deadline = time.time() + 120
+                    while time.time() < deadline:
+                        try:
+                            pod = core_v1.read_namespaced_pod(
+                                name=_pod_name, namespace=namespace
+                            )
+                            phase = getattr(pod.status, "phase", None)
+                            ip = getattr(pod.status, "pod_ip", None)
+                            if phase == "Running" and ip:
+                                _pod_ip = ip
+                                break
+                        except Exception:
+                            pass
+                        yield f"[agent] Waiting for pod {_pod_name} (phase={phase})...\n".encode()
+                        await asyncio.sleep(5)
+                    else:
+                        yield "[agent] Timeout waiting for pool pod to be ready\n".encode()
+                        return
 
-            return Response(
-                content=f"Execution failed: {e}",
-                status_code=500,
-            )
+                    yield f"[agent] Pool pod ready with IP: {_pod_ip}\n".encode()
+
+                    # Register in pool
+                    async with pool_lock:
+                        pod_pool[_pod_name] = PodState(
+                            pod_name=_pod_name,
+                            status="busy",
+                            config_hash=config_hash,
+                            config=config,
+                            last_used=datetime.utcnow().isoformat(),
+                            created=datetime.utcnow().isoformat(),
+                            pod_ip=_pod_ip,
+                            namespace=namespace,
+                        )
+                else:
+                    yield f"[agent] ♻️  Reusing warm pod: {_pod_name}\n".encode()
+
+                # Execute on pod
+                yield "[agent] Sending payload to executor...\n".encode()
+                try:
+                    result = await _execute_on_pod(
+                        pod_ip=_pod_ip,
+                        payload_bytes=payload_bytes,
+                        timeout=config.get("timeout", 3600),
+                    )
+                    # Mark pod idle
+                    async with pool_lock:
+                        if _pod_name in pod_pool:
+                            pod_pool[_pod_name].status = "idle"
+                            pod_pool[_pod_name].last_used = datetime.utcnow().isoformat()
+                    yield result.encode()
+                except Exception as e:
+                    async with pool_lock:
+                        if _pod_name in pod_pool:
+                            pod_pool[_pod_name].status = "idle"
+                    yield f"[agent] Execution failed: {e}\n".encode()
+
+            except Exception as e:
+                yield f"[agent] Pool streamer error: {e}\n".encode()
+
+        return StreamingResponse(pool_streamer(), media_type="text/plain")
+
     else:
         # Legacy mode: stream logs from Job
         async def log_streamer():
