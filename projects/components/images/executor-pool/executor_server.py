@@ -105,3 +105,4 @@ if __name__ == "__main__":
     print(f"[EXECUTOR] Starting executor server on port {port}")
     # Single-threaded mode to align with one-request-per-pod semantics
     app.run(host="0.0.0.0", port=port)
+# build trigger
