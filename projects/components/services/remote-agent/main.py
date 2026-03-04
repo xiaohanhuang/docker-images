@@ -3,16 +3,22 @@ ML Platform Remote Execution Agent Service.
 
 FastAPI service that receives serialized Python functions from @remote decorator,
 creates Kubernetes Jobs to execute them on GPU nodes, streams logs, and returns results.
+
+Phase 2: Pod Pool support — reuses warm containers to reduce cold-start latency.
 """
 
 import asyncio
 import base64
+import hashlib
 import os
 import time
 import uuid
-from typing import Optional
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Dict, Optional
 
 import cloudpickle
+import requests
 import uvicorn
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import StreamingResponse
@@ -34,6 +40,47 @@ except config.ConfigException:
 # Initialize Kubernetes clients
 batch_v1 = client.BatchV1Api()
 core_v1 = client.CoreV1Api()
+
+# Pod Pool Configuration
+POD_POOL_TTL_SECONDS = int(os.getenv("POD_POOL_TTL_SECONDS", "600"))  # 10 minutes default
+POD_POOL_ENABLED = os.getenv("POD_POOL_ENABLED", "true").lower() == "true"
+
+
+@dataclass
+class PodState:
+    """State of a pod in the pool."""
+
+    pod_name: str
+    status: str  # "idle" or "busy"
+    config_hash: str
+    config: Dict
+    last_used: str
+    created: str
+    pod_ip: Optional[str] = None
+    namespace: str = "default"
+
+
+# Global pod pool state (in-memory)
+# In production, this could be Redis for HA across multiple agent replicas
+pod_pool: Dict[str, PodState] = {}
+pool_lock = asyncio.Lock()
+
+
+def compute_config_hash(config: dict) -> str:
+    """
+    Compute a hash of the execution config for pod matching.
+
+    Pods with the same config hash can be reused.
+    Hash is based on: image, gpu count, gpu_type, and sorted packages.
+    """
+    image = config.get("image", "")
+    gpu = config.get("gpu", 0)
+    gpu_type = config.get("gpu_type", "any")
+    packages = sorted(config.get("packages", []))
+
+    # Create deterministic hash string
+    hash_input = f"{image}:{gpu}:{gpu_type}:{','.join(packages)}"
+    return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
 
 # Create FastAPI app
 app = FastAPI(
@@ -130,10 +177,53 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/pool")
+async def get_pool_status():
+    """Get current pod pool status."""
+    async with pool_lock:
+        pool_status = []
+        for pod_name, state in pod_pool.items():
+            pool_status.append(
+                {
+                    "pod_name": pod_name,
+                    "status": state.status,
+                    "config_hash": state.config_hash,
+                    "config": state.config,
+                    "last_used": state.last_used,
+                    "created": state.created,
+                    "pod_ip": state.pod_ip,
+                }
+            )
+        return {
+            "pool_enabled": POD_POOL_ENABLED,
+            "ttl_seconds": POD_POOL_TTL_SECONDS,
+            "total_pods": len(pod_pool),
+            "idle_pods": sum(1 for s in pod_pool.values() if s.status == "idle"),
+            "busy_pods": sum(1 for s in pod_pool.values() if s.status == "busy"),
+            "pods": pool_status,
+        }
+
+
+@app.get("/pool/stats")
+async def get_pool_stats():
+    """Get pool statistics."""
+    async with pool_lock:
+        return {
+            "pool_enabled": POD_POOL_ENABLED,
+            "ttl_seconds": POD_POOL_TTL_SECONDS,
+            "total_pods": len(pod_pool),
+            "idle_pods": sum(1 for s in pod_pool.values() if s.status == "idle"),
+            "busy_pods": sum(1 for s in pod_pool.values() if s.status == "busy"),
+            "config_hashes": list(set(s.config_hash for s in pod_pool.values())),
+        }
+
+
 @app.post("/execute")
 async def execute_remote(request: Request):
     """
     Execute a serialized function on a GPU pod.
+
+    Phase 2: Pod Pool support — reuses warm containers when config matches.
 
     ⚠️  SECURITY WARNING (Phase 1 MVP):
     This endpoint accepts arbitrary cloudpickle payloads and executes them with cluster
@@ -174,73 +264,371 @@ async def execute_remote(request: Request):
     if not fn:
         return Response(content="Missing 'fn' in payload", status_code=400)
 
-    # 2. Create unique execution ID
-    execution_id = f"remote-exec-{uuid.uuid4().hex[:8]}"
+    # 2. Compute config hash
+    config_hash = compute_config_hash(config)
     namespace = config.get("namespace", "default")
 
-    print(f"[agent] New execution request: {execution_id}")
+    print("[agent] New execution request")
     print(f"[agent] Function: {fn.__name__}")
+    print(f"[agent] Config hash: {config_hash}")
     print(f"[agent] Namespace: {namespace}")
+    print(f"[agent] Pool enabled: {POD_POOL_ENABLED}")
 
-    # 3. Create Kubernetes Job
-    try:
-        _create_execution_job(
-            execution_id=execution_id,
-            payload_bytes=payload_bytes,
-            config=config,
-            namespace=namespace,
-        )
-        print(f"[agent] Created Job: {execution_id}")
-    except Exception as e:
-        print(f"[agent] Failed to create Job: {e}")
-        return Response(
-            content=f"Failed to create execution job: {e}",
-            status_code=500,
-        )
+    # 3. Check per-call ttl: ttl=0 forces legacy one-shot mode
+    per_call_ttl = config.get("ttl")
+    use_pool = POD_POOL_ENABLED and per_call_ttl != 0
 
-    # 4. Stream logs and return result
-    async def log_streamer():
-        """Stream logs from execution pod and return result."""
+    # 4. Try to find an idle pod with matching config (if pool enabled)
+    pod_name = None
+    pod_ip = None
+
+    if use_pool:
+        async with pool_lock:
+            v1 = client.CoreV1Api()
+            for name, state in list(pod_pool.items()):
+                if state.status != "idle" or state.config_hash != config_hash:
+                    continue
+
+                # Validate that the pod still exists and is Running with a valid IP
+                try:
+                    pod = v1.read_namespaced_pod(name=name, namespace=state.namespace)
+                except ApiException as exc:
+                    if exc.status == 404:
+                        print(f"[agent] Pooled pod {name} no longer exists; removing")
+                        pod_pool.pop(name, None)
+                        continue
+                    print(f"[agent] Error reading pod {name}: {exc}")
+                    continue
+
+                pod_phase = getattr(pod.status, "phase", None)
+                current_ip = getattr(pod.status, "pod_ip", None)
+                if pod_phase != "Running" or not current_ip:
+                    print(
+                        f"[agent] Pooled pod {name} not ready "
+                        f"(phase={pod_phase}, ip={current_ip}); skipping"
+                    )
+                    continue
+
+                # Found a matching, healthy idle pod
+                print(f"[agent] ♻️  Reusing warm pod: {name} with IP: {current_ip}")
+                state.pod_ip = current_ip
+                state.status = "busy"
+                state.last_used = datetime.utcnow().isoformat()
+                pod_name = name
+                pod_ip = current_ip
+                break
+
+    # 5. If no matching pod found, create a new one
+    if not pod_name:
+        execution_id = f"remote-exec-{uuid.uuid4().hex[:8]}"
+        print(f"[agent] Creating new pod: {execution_id}")
 
         try:
-            # Wait for pod to be created
-            pod_name = await _wait_for_pod(execution_id, namespace, timeout=120)
-            if not pod_name:
-                yield "[agent] Timeout waiting for pod to be created\n".encode()
-                return
+            if use_pool:
+                # Create long-lived pod with executor server
+                pod_name = await _create_executor_pod(
+                    execution_id=execution_id,
+                    config=config,
+                    namespace=namespace,
+                    config_hash=config_hash,
+                )
+                # Wait for pod to be ready and get IP
+                pod_ip = await _wait_for_pod_ready(pod_name, namespace, timeout=120)
+                if not pod_ip:
+                    return Response(
+                        content="Timeout waiting for pod to be ready",
+                        status_code=500,
+                    )
+                print(f"[agent] Pod ready with IP: {pod_ip}")
 
-            yield f"[agent] Pod {pod_name} created, waiting for logs...\n".encode()
+                # Add to pool
+                async with pool_lock:
+                    pod_pool[pod_name] = PodState(
+                        pod_name=pod_name,
+                        status="busy",
+                        config_hash=config_hash,
+                        config=config,
+                        last_used=datetime.utcnow().isoformat(),
+                        created=datetime.utcnow().isoformat(),
+                        pod_ip=pod_ip,
+                        namespace=namespace,
+                    )
+            else:
+                # Legacy mode: create one-shot Job
+                _create_execution_job(
+                    execution_id=execution_id,
+                    payload_bytes=payload_bytes,
+                    config=config,
+                    namespace=namespace,
+                )
+                print(f"[agent] Created Job: {execution_id}")
+        except Exception as e:
+            print(f"[agent] Failed to create pod/job: {e}")
+            return Response(
+                content=f"Failed to create execution pod: {e}",
+                status_code=500,
+            )
 
-            # Stream logs from pod
-            async for log_line in _stream_pod_logs(pod_name, namespace):
-                yield log_line.encode()
+    # 6. Execute function
+    if use_pool:
+        # Send payload to executor pod via HTTP
+        try:
+            result = await _execute_on_pod(
+                pod_ip=pod_ip,
+                payload_bytes=payload_bytes,
+                timeout=config.get("timeout", 3600),
+            )
 
-            # Wait for job completion
-            timeout_val = config.get("timeout", 3600)
-            await _wait_for_job_completion(execution_id, namespace, timeout=timeout_val)
+            # Mark pod as idle
+            async with pool_lock:
+                if pod_name in pod_pool:
+                    pod_pool[pod_name].status = "idle"
+                    pod_pool[pod_name].last_used = datetime.utcnow().isoformat()
 
-            yield "\n[agent] Execution completed\n".encode()
+            # Return result
+            return Response(content=result, media_type="text/plain")
 
         except Exception as e:
-            yield f"\n[agent] Error during execution: {e}\n".encode()
+            print(f"[agent] Execution failed on pod {pod_name}: {e}")
 
-        finally:
-            # Cleanup job (with grace period for log retrieval)
+            # Mark pod as idle (or delete if corrupted?)
+            async with pool_lock:
+                if pod_name in pod_pool:
+                    pod_pool[pod_name].status = "idle"
+
+            return Response(
+                content=f"Execution failed: {e}",
+                status_code=500,
+            )
+    else:
+        # Legacy mode: stream logs from Job
+        async def log_streamer():
+            """Stream logs from execution pod and return result."""
+
             try:
-                await asyncio.sleep(5)  # Give time for final logs
-                batch_v1.delete_namespaced_job(
-                    name=execution_id,
-                    namespace=namespace,
-                    propagation_policy="Background",
-                )
-                print(f"[agent] Cleaned up Job: {execution_id}")
-            except Exception as e:
-                print(f"[agent] Failed to cleanup Job: {e}")
+                # Wait for pod to be created
+                job_pod_name = await _wait_for_pod(execution_id, namespace, timeout=120)
+                if not job_pod_name:
+                    yield "[agent] Timeout waiting for pod to be created\n".encode()
+                    return
 
-    return StreamingResponse(
-        log_streamer(),
-        media_type="text/plain",
+                yield f"[agent] Pod {job_pod_name} created, waiting for logs...\n".encode()
+
+                # Stream logs from pod
+                async for log_line in _stream_pod_logs(job_pod_name, namespace):
+                    yield log_line.encode()
+
+                # Wait for job completion
+                timeout_val = config.get("timeout", 3600)
+                await _wait_for_job_completion(execution_id, namespace, timeout=timeout_val)
+
+                yield "\n[agent] Execution completed\n".encode()
+
+            except Exception as e:
+                yield f"\n[agent] Error during execution: {e}\n".encode()
+
+            finally:
+                # Cleanup job (with grace period for log retrieval)
+                try:
+                    await asyncio.sleep(5)  # Give time for final logs
+                    batch_v1.delete_namespaced_job(
+                        name=execution_id,
+                        namespace=namespace,
+                        propagation_policy="Background",
+                    )
+                    print(f"[agent] Cleaned up Job: {execution_id}")
+                except Exception as e:
+                    print(f"[agent] Failed to cleanup Job: {e}")
+
+        return StreamingResponse(
+            log_streamer(),
+            media_type="text/plain",
+        )
+
+
+async def _create_executor_pod(
+    execution_id: str,
+    config: dict,
+    namespace: str,
+    config_hash: str,
+) -> str:
+    """
+    Create a long-lived executor pod for the pool.
+
+    Returns: pod name
+    """
+    # Determine node selector based on GPU type
+    node_selector = {}
+    if config.get("gpu", 0) > 0:
+        node_selector["role"] = "gpu-worker"
+        gpu_type = config.get("gpu_type", "any")
+        if gpu_type == "a10g":
+            node_selector["karpenter.k8s.aws/instance-gpu-name"] = "a10g"
+        elif gpu_type == "a100":
+            node_selector["karpenter.k8s.aws/instance-gpu-name"] = "a100"
+
+    # GPU tolerations
+    tolerations = []
+    if config.get("gpu", 0) > 0:
+        tolerations.append(
+            client.V1Toleration(
+                key="nvidia.com/gpu",
+                operator="Exists",
+                effect="NoSchedule",
+            )
+        )
+
+    # Determine image — custom images must include the executor HTTP server
+    if config.get("gpu", 0) > 0:
+        default_image = "ml-platform/executor-pool:latest"
+    else:
+        default_image = "ml-platform/executor-pool:latest"  # Same for now
+    user_image = config.get("image")
+    if user_image:
+        print(
+            f"[agent] ⚠️  Custom image '{user_image}' in pool mode — "
+            "it must run the executor HTTP server on :8080 (/health, /execute)"
+        )
+    image = user_image or default_image
+    ecr_registry = os.getenv("ECR_REGISTRY", "805673386114.dkr.ecr.us-west-2.amazonaws.com")
+    if image.startswith("ml-platform/"):
+        image = f"{ecr_registry}/{image}"
+
+    # Resource requests and limits
+    gpu_count = config.get("gpu", 0)
+    resources_dict = {
+        "cpu": config.get("cpu", "4"),
+        "memory": config.get("memory", "16Gi"),
+    }
+    if gpu_count > 0:
+        resources_dict["nvidia.com/gpu"] = str(gpu_count)
+
+    # Create Pod manifest
+    pod = client.V1Pod(
+        api_version="v1",
+        kind="Pod",
+        metadata=client.V1ObjectMeta(
+            name=execution_id,
+            namespace=namespace,
+            labels={
+                "app": "remote-execution-pool",
+                "config-hash": config_hash,
+                "managed-by": "remote-agent",
+            },
+        ),
+        spec=client.V1PodSpec(
+            restart_policy="OnFailure",
+            node_selector=node_selector if node_selector else None,
+            tolerations=tolerations if tolerations else None,
+            containers=[
+                client.V1Container(
+                    name="executor",
+                    image=image,
+                    ports=[client.V1ContainerPort(container_port=8080, name="http")],
+                    env=(
+                        [client.V1EnvVar(name="PORT", value="8080")]
+                        + [
+                            client.V1EnvVar(name=str(k), value=str(v))
+                            for k, v in (config.get("env") or {}).items()
+                        ]
+                    ),
+                    resources=client.V1ResourceRequirements(
+                        requests=resources_dict,
+                        limits=resources_dict,
+                    ),
+                    readiness_probe=client.V1Probe(
+                        http_get=client.V1HTTPGetAction(
+                            path="/health",
+                            port=8080,
+                        ),
+                        initial_delay_seconds=5,
+                        period_seconds=5,
+                    ),
+                )
+            ],
+        ),
     )
+
+    # Create pod in cluster
+    core_v1.create_namespaced_pod(namespace=namespace, body=pod)
+    return execution_id
+
+
+async def _wait_for_pod_ready(
+    pod_name: str, namespace: str, timeout: int = 120
+) -> Optional[str]:
+    """
+    Wait for pod to be ready and return its IP.
+
+    Returns: pod IP or None if timeout
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            pod = core_v1.read_namespaced_pod(name=pod_name, namespace=namespace)
+
+            # Check if ready
+            if pod.status.phase == "Running" and pod.status.pod_ip:
+                # Check readiness conditions
+                if pod.status.conditions:
+                    ready = False
+                    for condition in pod.status.conditions:
+                        if condition.type == "Ready" and condition.status == "True":
+                            ready = True
+                            break
+                    if ready:
+                        print(f"[agent] Pod {pod_name} is ready with IP {pod.status.pod_ip}")
+                        return pod.status.pod_ip
+
+        except Exception as e:
+            print(f"[agent] Error checking pod readiness: {e}")
+
+        await asyncio.sleep(2)
+
+    print(f"[agent] Timeout waiting for pod {pod_name} to be ready")
+    return None
+
+
+async def _execute_on_pod(
+    pod_ip: str,
+    payload_bytes: bytes,
+    timeout: int = 3600,
+) -> str:
+    """
+    Execute payload on a running executor pod via HTTP.
+
+    Returns: result string (with markers for client parsing)
+    """
+    url = f"http://{pod_ip}:8080/execute"
+
+    try:
+        # Run blocking HTTP call in a thread to avoid blocking the event loop
+        response = await asyncio.to_thread(
+            requests.post,
+            url,
+            data=payload_bytes,
+            headers={"Content-Type": "application/octet-stream"},
+            timeout=(10, timeout),
+        )
+        response.raise_for_status()
+
+        result = response.json()
+
+        if result.get("success"):
+            # Format result with markers for client parsing
+            result_b64 = result.get("result", "")
+            output = "[agent] Execution completed on warm pod\n"
+            output += f"__RESULT_START__\n{result_b64}\n__RESULT_END__\n"
+            return output
+        else:
+            # Execution failed
+            result_b64 = result.get("result", "")
+            output = "[agent] Execution failed on warm pod\n"
+            output += f"__RESULT_START__\n{result_b64}\n__RESULT_END__\n"
+            return output
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to execute on pod {pod_ip}: {e}")
 
 
 def _create_execution_job(
@@ -286,10 +674,22 @@ def _create_execution_job(
         image = f"{ecr_registry}/{image}"
 
     # Build environment variables
+    # ⚠️  PAYLOAD SIZE LIMITATION (Phase 1):
+    # The payload is passed as a base64-encoded environment variable. Kubernetes has a
+    # practical limit of ~1MB for the total size of all env vars in a pod spec. Large
+    # closures or arguments will cause "request entity too large" errors.
+    # Phase 2 will store payloads in S3 and pass a reference URI instead.
+    payload_b64 = base64.b64encode(payload_bytes).decode()
+    if len(payload_b64) > 900_000:  # ~900KB safety margin
+        raise ValueError(
+            f"Serialized payload too large ({len(payload_b64)} bytes). "
+            "Kubernetes env vars have a ~1MB limit. "
+            "Pass large data via S3 URIs instead of function arguments."
+        )
     env_vars = [
         client.V1EnvVar(
             name="PAYLOAD_B64",
-            value=base64.b64encode(payload_bytes).decode(),
+            value=payload_b64,
         ),
     ]
 
@@ -481,6 +881,71 @@ async def _wait_for_job_completion(execution_id: str, namespace: str, timeout: i
         await asyncio.sleep(5)
 
     print(f"[agent] Job {execution_id} timed out after {timeout}s")
+
+
+async def _ttl_eviction_task():
+    """
+    Background task to evict idle pods that exceed TTL.
+
+    Runs every 60 seconds, checking all idle pods and deleting those
+    where (now - last_used) > POD_POOL_TTL_SECONDS.
+    """
+    print(f"[agent] Starting TTL eviction task (TTL={POD_POOL_TTL_SECONDS}s)")
+
+    while True:
+        try:
+            await asyncio.sleep(60)  # Check every minute
+
+            if not POD_POOL_ENABLED:
+                continue
+
+            now = datetime.utcnow()
+            pods_to_evict = []
+
+            async with pool_lock:
+                for pod_name, state in pod_pool.items():
+                    if state.status == "idle":
+                        last_used = datetime.fromisoformat(state.last_used)
+                        idle_seconds = (now - last_used).total_seconds()
+
+                        if idle_seconds > POD_POOL_TTL_SECONDS:
+                            print(
+                                f"[agent] Pod {pod_name} idle for {idle_seconds:.0f}s "
+                                f"(TTL={POD_POOL_TTL_SECONDS}s), evicting"
+                            )
+                            pods_to_evict.append(pod_name)
+
+            # Delete pods outside the lock
+            for pod_name in pods_to_evict:
+                try:
+                    namespace = pod_pool[pod_name].namespace
+                    core_v1.delete_namespaced_pod(
+                        name=pod_name,
+                        namespace=namespace,
+                        grace_period_seconds=30,
+                    )
+                    print(f"[agent] Evicted pod {pod_name}")
+
+                    # Remove from pool
+                    async with pool_lock:
+                        if pod_name in pod_pool:
+                            del pod_pool[pod_name]
+
+                except Exception as e:
+                    print(f"[agent] Failed to evict pod {pod_name}: {e}")
+
+        except Exception as e:
+            print(f"[agent] Error in TTL eviction task: {e}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks on application startup."""
+    if POD_POOL_ENABLED:
+        print(f"[agent] Pod Pool enabled with TTL={POD_POOL_TTL_SECONDS}s")
+        asyncio.create_task(_ttl_eviction_task())
+    else:
+        print("[agent] Pod Pool disabled, using legacy one-shot Jobs")
 
 
 if __name__ == "__main__":
