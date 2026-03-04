@@ -30,7 +30,7 @@ ARG EVALUATE_VERSION=0.4.2
 ARG ROUGE_VERSION=0.1.2
 ARG SENTENCEPIECE_VERSION=0.2.0
 
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --ignore-installed \
     transformers==${TRANSFORMERS_VERSION} \
     accelerate==${ACCELERATE_VERSION} \
     peft==${PEFT_VERSION} \

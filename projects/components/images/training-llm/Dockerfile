@@ -29,7 +29,7 @@ ARG BITSANDBYTES_VERSION=0.41.3
 ARG DEEPSPEED_VERSION=0.12.6
 ARG FLYTE_RAY_PLUGIN=1.14.3
 
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --ignore-installed \
     transformers==${TRANSFORMERS_VERSION} \
     accelerate==${ACCELERATE_VERSION} \
     peft==${PEFT_VERSION} \

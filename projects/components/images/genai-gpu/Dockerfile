@@ -34,7 +34,7 @@ ARG CHROMADB_VERSION=0.4.24
 ARG PSYCOPG2_VERSION=2.9.9
 ARG PGVECTOR_VERSION=0.3.5
 
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir --ignore-installed \
     vllm==${VLLM_VERSION} \
     langchain==${LANGCHAIN_VERSION} \
     langchain-community==${LANGCHAIN_COMMUNITY_VERSION} \
