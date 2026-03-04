@@ -19,13 +19,12 @@ ARG BASE_TAG=py3.12-1.0.0
 FROM ${REGISTRY}/${REPO}/base-cpu:${BASE_TAG}
 
 ARG FLYTEKIT_VERSION=1.14.3
-ARG BOTO3_VERSION=1.34.84
 ARG S3FS_VERSION=2024.3.1
 ARG REQUESTS_VERSION=2.31.0
 
 RUN pip install --no-cache-dir \
     flytekit==${FLYTEKIT_VERSION} \
-    boto3==${BOTO3_VERSION} \
+    boto3 \
     s3fs==${S3FS_VERSION} \
     requests==${REQUESTS_VERSION}
 

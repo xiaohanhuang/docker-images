@@ -265,7 +265,6 @@ jobs:
             REPO=${{ env.ECR_REPO }}
             BASE_TAG=${{ env.TAG_BASE_CPU }}
             FLYTEKIT_VERSION=${{ env.FLYTEKIT_VERSION }}
-            BOTO3_VERSION=${{ env.BOTO3_VERSION }}
             S3FS_VERSION=${{ env.S3FS_VERSION }}
             REQUESTS_VERSION=${{ env.REQUESTS_VERSION }}
           tags: |
@@ -287,7 +286,6 @@ jobs:
             REPO=${{ env.ECR_REPO }}
             BASE_TAG=${{ env.TAG_BASE_GPU }}
             FLYTEKIT_VERSION=${{ env.FLYTEKIT_VERSION }}
-            BOTO3_VERSION=${{ env.BOTO3_VERSION }}
             S3FS_VERSION=${{ env.S3FS_VERSION }}
             REQUESTS_VERSION=${{ env.REQUESTS_VERSION }}
           tags: |
@@ -311,7 +309,6 @@ jobs:
             RAY_VERSION=${{ env.RAY_VERSION }}
             PANDAS_VERSION=${{ env.PANDAS_VERSION }}
             PYARROW_VERSION=${{ env.PYARROW_VERSION }}
-            BOTO3_VERSION=${{ env.BOTO3_VERSION }}
             S3FS_VERSION=${{ env.S3FS_VERSION }}
           tags: |
             ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/ray-worker:${{ env.TAG_RAY_WORKER }}
