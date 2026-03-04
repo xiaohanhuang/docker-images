@@ -499,6 +499,8 @@ async def _create_executor_pod(
             node_selector["karpenter.k8s.aws/instance-gpu-name"] = "a10g"
         elif gpu_type == "a100":
             node_selector["karpenter.k8s.aws/instance-gpu-name"] = "a100"
+    else:
+        node_selector["role"] = "cpu-worker"
 
     # GPU tolerations
     tolerations = []
@@ -512,10 +514,11 @@ async def _create_executor_pod(
         )
 
     # Determine image — custom images must include the executor HTTP server
+    # executor-pool-cpu is ~200MB (python:slim + flask); executor-pool is 7.9GB (CUDA/PyTorch)
     if config.get("gpu", 0) > 0:
         default_image = "ml-platform/executor-pool:latest"
     else:
-        default_image = "ml-platform/executor-pool:latest"  # Same for now
+        default_image = "ml-platform/executor-pool-cpu:latest"
     user_image = config.get("image")
     if user_image:
         print(
