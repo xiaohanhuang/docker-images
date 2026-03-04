@@ -371,7 +371,8 @@ async def execute_remote(request: Request):
                     yield f"[agent] Pool pod {_pod_name} created, waiting for ready...\n".encode()
 
                     # Wait for pod ready, streaming heartbeats every 5s
-                    deadline = time.time() + 120
+                    # 600s allows for Karpenter node provisioning (~2-3 min cold start)
+                    deadline = time.time() + 600
                     while time.time() < deadline:
                         try:
                             pod = core_v1.read_namespaced_pod(
