@@ -36,6 +36,8 @@ jobs:
       base_cpu: ${{ steps.changes.outputs.base_cpu }}
       base_gpu: ${{ steps.changes.outputs.base_gpu }}
       executor_pool: ${{ steps.changes.outputs.executor_pool }}
+      executor_pool_cpu: ${{ steps.changes.outputs.executor_pool_cpu }}
+      executor_pool_cpu: ${{ steps.changes.outputs.executor_pool_cpu }}
       ray_worker: ${{ steps.changes.outputs.ray_worker }}
       training_llm: ${{ steps.changes.outputs.training_llm }}
       notebook_cpu: ${{ steps.changes.outputs.notebook_cpu }}
@@ -77,6 +79,12 @@ jobs:
             executor_pool:
               - 'projects/components/images/executor-pool/**'
               - 'projects/components/images/base-gpu/**'
+            executor_pool_cpu:
+              - 'projects/components/images/executor-pool-cpu/**'
+              - 'projects/components/images/base-cpu/**'
+            executor_pool_cpu:
+              - 'projects/components/images/executor-pool-cpu/**'
+              - 'projects/components/images/base-cpu/**'
             ray_worker:
               - 'projects/ray/images/**'
               - 'projects/components/images/base-gpu/**'
@@ -295,6 +303,34 @@ jobs:
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push executor-pool-cpu
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.executor_pool_cpu == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/components/images/executor-pool-cpu
+          file: projects/components/images/executor-pool-cpu/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool-cpu:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push executor-pool-cpu
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.executor_pool_cpu == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/components/images/executor-pool-cpu
+          file: projects/components/images/executor-pool-cpu/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool-cpu:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
