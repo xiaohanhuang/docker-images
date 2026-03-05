@@ -373,6 +373,7 @@ async def execute_remote(request: Request):
                     # Wait for pod ready, streaming heartbeats every 5s
                     # 600s allows for Karpenter node provisioning (~2-3 min cold start)
                     deadline = time.time() + 600
+                    start_wait = time.time()
                     while time.time() < deadline:
                         try:
                             pod = core_v1.read_namespaced_pod(
@@ -385,13 +386,15 @@ async def execute_remote(request: Request):
                                 break
                         except Exception:
                             pass
-                        yield f"[agent] Waiting for pod {_pod_name} (phase={phase})...\n".encode()
+                        elapsed = int(time.time() - start_wait)
+                        status = f"\r[agent] Waiting for pod ready (phase={phase}, {elapsed}s)..."
+                        yield status.encode()
                         await asyncio.sleep(5)
                     else:
-                        yield "[agent] Timeout waiting for pool pod to be ready\n".encode()
+                        yield "\n[agent] Timeout waiting for pool pod to be ready\n".encode()
                         return
 
-                    yield f"[agent] Pool pod ready with IP: {_pod_ip}\n".encode()
+                    yield f"\n[agent] Pool pod ready with IP: {_pod_ip}\n".encode()
 
                     # Register in pool
                     async with pool_lock:
@@ -650,16 +653,16 @@ async def _execute_on_pod(
 
         result = response.json()
 
+        stdout_log = result.get("stdout", "")
+        result_b64 = result.get("result", "")
         if result.get("success"):
-            # Format result with markers for client parsing
-            result_b64 = result.get("result", "")
-            output = "[agent] Execution completed on warm pod\n"
+            output = stdout_log
+            output += "[agent] Execution completed on warm pod\n"
             output += f"__RESULT_START__\n{result_b64}\n__RESULT_END__\n"
             return output
         else:
-            # Execution failed
-            result_b64 = result.get("result", "")
-            output = "[agent] Execution failed on warm pod\n"
+            output = stdout_log
+            output += "[agent] Execution failed on warm pod\n"
             output += f"__RESULT_START__\n{result_b64}\n__RESULT_END__\n"
             return output
 
@@ -1058,4 +1061,3 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", "8080"))
     print(f"[agent] Starting ML Platform Remote Execution Agent on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
-
