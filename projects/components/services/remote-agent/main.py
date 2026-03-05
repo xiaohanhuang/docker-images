@@ -388,11 +388,12 @@ async def execute_remote(request: Request):
                                     break
                             except Exception:
                                 pass
-                        status = (
-                            f"\r[agent] Waiting for pod ready "
+                        # \r + ANSI erase-to-EOL; pad to >1KB to flush uvicorn buffer
+                        line = (
+                            f"\r\033[K[agent] Waiting for pod ready "
                             f"(phase={phase}, {wait_secs}s)..."
                         )
-                        yield status.encode()
+                        yield line.ljust(1200).encode()
                         await asyncio.sleep(1)
                         wait_secs += 1
                     else:
