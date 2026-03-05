@@ -370,26 +370,31 @@ async def execute_remote(request: Request):
 
                     yield f"[agent] Pool pod {_pod_name} created, waiting for ready...\n".encode()
 
-                    # Wait for pod ready, streaming heartbeats every 5s
+                    # Wait for pod ready — update display every 1s, check k8s every 5s.
                     # 600s allows for Karpenter node provisioning (~2-3 min cold start)
-                    deadline = time.time() + 600
-                    start_wait = time.time()
-                    while time.time() < deadline:
-                        try:
-                            pod = core_v1.read_namespaced_pod(
-                                name=_pod_name, namespace=namespace
-                            )
-                            phase = getattr(pod.status, "phase", None)
-                            ip = getattr(pod.status, "pod_ip", None)
-                            if phase == "Running" and ip:
-                                _pod_ip = ip
-                                break
-                        except Exception:
-                            pass
-                        elapsed = int(time.time() - start_wait)
-                        status = f"\r[agent] Waiting for pod ready (phase={phase}, {elapsed}s)..."
+                    phase = "Pending"
+                    wait_secs = 0
+                    while wait_secs < 600:
+                        # Check pod every 5 seconds
+                        if wait_secs % 5 == 0:
+                            try:
+                                pod = core_v1.read_namespaced_pod(
+                                    name=_pod_name, namespace=namespace
+                                )
+                                phase = getattr(pod.status, "phase", "Unknown")
+                                ip = getattr(pod.status, "pod_ip", None)
+                                if phase == "Running" and ip:
+                                    _pod_ip = ip
+                                    break
+                            except Exception:
+                                pass
+                        status = (
+                            f"\r[agent] Waiting for pod ready "
+                            f"(phase={phase}, {wait_secs}s)..."
+                        )
                         yield status.encode()
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(1)
+                        wait_secs += 1
                     else:
                         yield "\n[agent] Timeout waiting for pool pod to be ready\n".encode()
                         return
