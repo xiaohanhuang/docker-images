@@ -25,7 +25,6 @@ env:
   # Update these to your AWS account / ECR registry.
   AWS_ROLE_ARN: arn:aws:iam::805673386114:role/github-actions-ecr-push-ml-platform-eks
   ECR_REGISTRY: 805673386114.dkr.ecr.us-west-2.amazonaws.com
-  ECR_REPO: ml-platform
 
 jobs:
   detect:
@@ -34,28 +33,19 @@ jobs:
     outputs:
       mode: ${{ steps.mode.outputs.mode }}
       changes: ${{ steps.changes.outputs.changes }}
-      # L1 base
-      base_cpu:       ${{ steps.changes.outputs.base_cpu }}
-      base_gpu:       ${{ steps.changes.outputs.base_gpu }}
-      # L2 framework
-      flyte_cpu:      ${{ steps.changes.outputs.flyte_cpu }}
-      flyte_gpu:      ${{ steps.changes.outputs.flyte_gpu }}
-      ray_worker:     ${{ steps.changes.outputs.ray_worker }}
-      # L3 workload
-      data_cpu:       ${{ steps.changes.outputs.data_cpu }}
-      ml_gpu:         ${{ steps.changes.outputs.ml_gpu }}
-      genai_gpu:      ${{ steps.changes.outputs.genai_gpu }}
-      training_llm:   ${{ steps.changes.outputs.training_llm }}
-      # Other platform images
-      executor_pool:     ${{ steps.changes.outputs.executor_pool }}
+      base_cpu: ${{ steps.changes.outputs.base_cpu }}
+      base_gpu: ${{ steps.changes.outputs.base_gpu }}
+      executor_pool: ${{ steps.changes.outputs.executor_pool }}
       executor_pool_cpu: ${{ steps.changes.outputs.executor_pool_cpu }}
-      notebook_cpu:      ${{ steps.changes.outputs.notebook_cpu }}
-      gpu_idle_monitor:  ${{ steps.changes.outputs.gpu_idle_monitor }}
-      spark_base:        ${{ steps.changes.outputs.spark_base }}
-      text2sql_serve:    ${{ steps.changes.outputs.text2sql_serve }}
-      workflow_cpu:      ${{ steps.changes.outputs.workflow_cpu }}
-      workflow_gpu:      ${{ steps.changes.outputs.workflow_gpu }}
-      remote_agent:      ${{ steps.changes.outputs.remote_agent }}
+      ray_worker: ${{ steps.changes.outputs.ray_worker }}
+      training_llm: ${{ steps.changes.outputs.training_llm }}
+      notebook_cpu: ${{ steps.changes.outputs.notebook_cpu }}
+      gpu_idle_monitor: ${{ steps.changes.outputs.gpu_idle_monitor }}
+      spark_base: ${{ steps.changes.outputs.spark_base }}
+      text2sql_serve: ${{ steps.changes.outputs.text2sql_serve }}
+      workflow_cpu: ${{ steps.changes.outputs.workflow_cpu }}
+      workflow_gpu: ${{ steps.changes.outputs.workflow_gpu }}
+      remote_agent: ${{ steps.changes.outputs.remote_agent }}
 
     steps:
       - uses: actions/checkout@v4
@@ -81,54 +71,23 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            # ── L1: base images ─────────────────────────────
             base_cpu:
               - 'projects/components/images/base-cpu/**'
-              - 'projects/components/images/versions.env'
             base_gpu:
               - 'projects/components/images/base-gpu/**'
-              - 'projects/components/images/versions.env'
-            # ── L2: framework images (include parent paths for cascading) ──
-            flyte_cpu:
-              - 'projects/components/images/flyte-cpu/**'
-              - 'projects/components/images/base-cpu/**'
-              - 'projects/components/images/versions.env'
-            flyte_gpu:
-              - 'projects/components/images/flyte-gpu/**'
-              - 'projects/components/images/base-gpu/**'
-              - 'projects/components/images/versions.env'
-            ray_worker:
-              - 'projects/components/images/ray-worker/**'
-              - 'projects/components/images/base-gpu/**'
-              - 'projects/components/images/versions.env'
-            # ── L3: workload images (include full parent chain) ──────────
-            data_cpu:
-              - 'projects/components/images/data-cpu/**'
-              - 'projects/components/images/flyte-cpu/**'
-              - 'projects/components/images/base-cpu/**'
-              - 'projects/components/images/versions.env'
-            ml_gpu:
-              - 'projects/components/images/ml-gpu/**'
-              - 'projects/components/images/flyte-gpu/**'
-              - 'projects/components/images/base-gpu/**'
-              - 'projects/components/images/versions.env'
-            genai_gpu:
-              - 'projects/components/images/genai-gpu/**'
-              - 'projects/components/images/flyte-gpu/**'
-              - 'projects/components/images/base-gpu/**'
-              - 'projects/components/images/versions.env'
-            training_llm:
-              - 'projects/components/images/training-llm/**'
-              - 'projects/components/images/ray-worker/**'
-              - 'projects/components/images/base-gpu/**'
-              - 'projects/components/images/versions.env'
-            # ── Other platform images ────────────────────────────
             executor_pool:
               - 'projects/components/images/executor-pool/**'
               - 'projects/components/images/base-gpu/**'
             executor_pool_cpu:
               - 'projects/components/images/executor-pool-cpu/**'
               - 'projects/components/images/base-cpu/**'
+            ray_worker:
+              - 'projects/ray/images/**'
+              - 'projects/components/images/base-gpu/**'
+            training_llm:
+              - 'projects/components/images/training-llm/**'
+              - 'projects/ray/images/**'
+              - 'projects/components/images/base-gpu/**'
             notebook_cpu:
               - 'projects/jupyter/images/**'
               - 'projects/components/sdk/**'
@@ -154,19 +113,16 @@ jobs:
   skip:
     runs-on: ubuntu-latest
     needs: detect
-    if: >-
-      needs.detect.outputs.mode == 'skip' ||
-      (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes == '[]')
+    if: needs.detect.outputs.mode == 'skip' || (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes == '[]')
 
     steps:
-      - run: echo "No relevant Docker context changes (or manual run without force=true); skipping."
+      - run: echo "No relevant Docker context changes (or manual run without force); skipping."
 
-  build-and-push:
+  # -- GPU stack: base-gpu -> executor-pool, ray-worker -> training-llm ----------
+  build-gpu-stack:
     runs-on: ubuntu-latest
     needs: detect
-    if: >-
-      needs.detect.outputs.mode == 'force' ||
-      (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes != '[]')
+    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes != '[]')
 
     permissions:
       id-token: write
@@ -187,325 +143,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Export every variable from versions.env (GNU Make := syntax) to
-      # GITHUB_ENV so subsequent steps can reference them as ${{ env.VAR }}.
-      - name: Load versions.env
-        run: |
-          while IFS= read -r line; do
-            [[ "$line" =~ ^[[:space:]]*# ]] && continue
-            [[ -z "${line// }" ]] && continue
-            if [[ "$line" =~ ^([A-Z0-9_]+)[[:space:]]*:?=[[:space:]]*([^#]*) ]]; then
-              key="${BASH_REMATCH[1]}"
-              val="${BASH_REMATCH[2]}"
-              val="${val%"${val##*[![:space:]]}"}"  
-              echo "$key=$val" >> "$GITHUB_ENV"
-            fi
-          done < projects/components/images/versions.env
-
-      # Compute the same descriptive tag prefixes the Makefile uses, e.g.:
-      #   base-gpu:cu12.9.1-torch2.9.0-1.0.0
-      #   flyte-cpu:fly1.14.3-1.0.0
-      - name: Compute image tags
-        run: |
-          echo "TAG_BASE_CPU=py${PYTHON_VERSION}-${IMAGE_TAG}"                       >> "$GITHUB_ENV"
-          echo "TAG_BASE_GPU=cu${CUDA_VERSION}-torch${TORCH_VERSION}-${IMAGE_TAG}"   >> "$GITHUB_ENV"
-          echo "TAG_FLYTE_CPU=fly${FLYTEKIT_VERSION}-${IMAGE_TAG}"                   >> "$GITHUB_ENV"
-          echo "TAG_FLYTE_GPU=fly${FLYTEKIT_VERSION}-cu${CUDA_VERSION}-${IMAGE_TAG}" >> "$GITHUB_ENV"
-          echo "TAG_RAY_WORKER=ray${RAY_VERSION}-cu${CUDA_VERSION}-${IMAGE_TAG}"     >> "$GITHUB_ENV"
-
-      # Build order matters: L1 must be pushed before L2, L2 before L3.
-
-      # ── L1: base images ────────────────────────────────────────────────────
-      - name: Build and push base-cpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.base_cpu == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/components/images/base-cpu
-          file: projects/components/images/base-cpu/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/base-cpu:${{ env.TAG_BASE_CPU }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/base-cpu:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
       - name: Build and push base-gpu
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.base_gpu == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: projects/components/images/base-gpu
+          context: .
           file: projects/components/images/base-gpu/Dockerfile
           platforms: linux/amd64
           push: true
-          build-args: |
-            CUDA_VERSION=${{ env.CUDA_VERSION }}
-            TORCH_VERSION=${{ env.TORCH_VERSION }}
-            TORCHVISION_VERSION=${{ env.TORCHVISION_VERSION }}
-            TORCHAUDIO_VERSION=${{ env.TORCHAUDIO_VERSION }}
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/base-gpu:${{ env.TAG_BASE_GPU }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/base-gpu:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # ── L2: framework images ───────────────────────────────────────────────
-      - name: Build and push flyte-cpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.flyte_cpu == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/components/images/flyte-cpu
-          file: projects/components/images/flyte-cpu/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            REGISTRY=${{ env.ECR_REGISTRY }}
-            REPO=${{ env.ECR_REPO }}
-            BASE_TAG=${{ env.TAG_BASE_CPU }}
-            FLYTEKIT_VERSION=${{ env.FLYTEKIT_VERSION }}
-            S3FS_VERSION=${{ env.S3FS_VERSION }}
-            REQUESTS_VERSION=${{ env.REQUESTS_VERSION }}
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/flyte-cpu:${{ env.TAG_FLYTE_CPU }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/flyte-cpu:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push flyte-gpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.flyte_gpu == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/components/images/flyte-gpu
-          file: projects/components/images/flyte-gpu/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            REGISTRY=${{ env.ECR_REGISTRY }}
-            REPO=${{ env.ECR_REPO }}
-            BASE_TAG=${{ env.TAG_BASE_GPU }}
-            FLYTEKIT_VERSION=${{ env.FLYTEKIT_VERSION }}
-            S3FS_VERSION=${{ env.S3FS_VERSION }}
-            REQUESTS_VERSION=${{ env.REQUESTS_VERSION }}
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/flyte-gpu:${{ env.TAG_FLYTE_GPU }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/flyte-gpu:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push ray-worker
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.ray_worker == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/components/images/ray-worker
-          file: projects/components/images/ray-worker/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            REGISTRY=${{ env.ECR_REGISTRY }}
-            REPO=${{ env.ECR_REPO }}
-            BASE_TAG=${{ env.TAG_BASE_GPU }}
-            RAY_VERSION=${{ env.RAY_VERSION }}
-            PANDAS_VERSION=${{ env.PANDAS_VERSION }}
-            PYARROW_VERSION=${{ env.PYARROW_VERSION }}
-            S3FS_VERSION=${{ env.S3FS_VERSION }}
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/ray-worker:${{ env.TAG_RAY_WORKER }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/ray-worker:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # ── L3: workload images ────────────────────────────────────────────────
-      - name: Build and push data-cpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.data_cpu == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/components/images/data-cpu
-          file: projects/components/images/data-cpu/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            REGISTRY=${{ env.ECR_REGISTRY }}
-            REPO=${{ env.ECR_REPO }}
-            BASE_TAG=${{ env.TAG_FLYTE_CPU }}
-            PANDAS_VERSION=${{ env.PANDAS_VERSION }}
-            PYARROW_VERSION=${{ env.PYARROW_VERSION }}
-            SKLEARN_VERSION=${{ env.SKLEARN_VERSION }}
-            TIKTOKEN_VERSION=${{ env.TIKTOKEN_VERSION }}
-            PYPDF_VERSION=${{ env.PYPDF_VERSION }}
-            BS4_VERSION=${{ env.BS4_VERSION }}
-            LXML_VERSION=${{ env.LXML_VERSION }}
-            NLTK_VERSION=${{ env.NLTK_VERSION }}
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/data-cpu:${{ env.IMAGE_TAG }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/data-cpu:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push ml-gpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.ml_gpu == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/components/images/ml-gpu
-          file: projects/components/images/ml-gpu/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            REGISTRY=${{ env.ECR_REGISTRY }}
-            REPO=${{ env.ECR_REPO }}
-            BASE_TAG=${{ env.TAG_FLYTE_GPU }}
-            TRANSFORMERS_VERSION=${{ env.TRANSFORMERS_VERSION }}
-            ACCELERATE_VERSION=${{ env.ACCELERATE_VERSION }}
-            PEFT_VERSION=${{ env.PEFT_VERSION }}
-            DATASETS_VERSION=${{ env.DATASETS_VERSION }}
-            MLFLOW_VERSION=${{ env.MLFLOW_VERSION }}
-            SKLEARN_VERSION=${{ env.SKLEARN_VERSION }}
-            EVALUATE_VERSION=${{ env.EVALUATE_VERSION }}
-            ROUGE_VERSION=${{ env.ROUGE_VERSION }}
-            SENTENCEPIECE_VERSION=${{ env.SENTENCEPIECE_VERSION }}
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/ml-gpu:${{ env.IMAGE_TAG }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/ml-gpu:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push genai-gpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.genai_gpu == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/components/images/genai-gpu
-          file: projects/components/images/genai-gpu/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            REGISTRY=${{ env.ECR_REGISTRY }}
-            REPO=${{ env.ECR_REPO }}
-            BASE_TAG=${{ env.TAG_FLYTE_GPU }}
-            VLLM_VERSION=${{ env.VLLM_VERSION }}
-            LANGCHAIN_VERSION=${{ env.LANGCHAIN_VERSION }}
-            LANGCHAIN_COMMUNITY_VERSION=${{ env.LANGCHAIN_COMMUNITY_VERSION }}
-            SENTENCE_TRANSFORMERS_VERSION=${{ env.SENTENCE_TRANSFORMERS_VERSION }}
-            OPENAI_VERSION=${{ env.OPENAI_VERSION }}
-            TIKTOKEN_VERSION=${{ env.TIKTOKEN_VERSION }}
-            FAISS_VERSION=${{ env.FAISS_VERSION }}
-            CHROMADB_VERSION=${{ env.CHROMADB_VERSION }}
-            PSYCOPG2_VERSION=${{ env.PSYCOPG2_VERSION }}
-            PGVECTOR_VERSION=${{ env.PGVECTOR_VERSION }}
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/genai-gpu:${{ env.IMAGE_TAG }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/genai-gpu:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push training-llm
-        continue-on-error: true
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.training_llm == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/components/images/training-llm
-          file: projects/components/images/training-llm/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            REGISTRY=${{ env.ECR_REGISTRY }}
-            REPO=${{ env.ECR_REPO }}
-            BASE_TAG=${{ env.TAG_RAY_WORKER }}
-            TRANSFORMERS_VERSION=${{ env.TRANSFORMERS_VERSION }}
-            ACCELERATE_VERSION=${{ env.ACCELERATE_VERSION }}
-            PEFT_VERSION=${{ env.PEFT_VERSION }}
-            DATASETS_VERSION=${{ env.DATASETS_VERSION }}
-            BITSANDBYTES_VERSION=${{ env.BITSANDBYTES_VERSION }}
-            DEEPSPEED_VERSION=${{ env.DEEPSPEED_VERSION }}
-            FLYTE_RAY_PLUGIN=${{ env.FLYTE_RAY_PLUGIN }}
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/training-llm:${{ env.IMAGE_TAG }}
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/training-llm:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # ── Other platform images ────────────────────────────────────────────────
-      - name: Build and push notebook-cpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_cpu == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: projects/jupyter/images/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/notebook-cpu:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/notebook-cpu:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push gpu-idle-monitor
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.gpu_idle_monitor == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/jupyter/gpu-idle-monitor
-          file: projects/jupyter/gpu-idle-monitor/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/gpu-idle-monitor:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/gpu-idle-monitor:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push spark-base
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.spark_base == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: projects/spark/images/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/spark-base:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/spark-base:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push text2sql-serve
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.text2sql_serve == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/workflows/text2sql/serve
-          file: projects/workflows/text2sql/serve/Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/text2sql-serve:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/text2sql-serve:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push workflow-cpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.workflow_cpu == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/workflows/text2sql
-          file: projects/workflows/text2sql/images/Dockerfile.cpu
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/workflow-cpu:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/workflow-cpu:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push workflow-gpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.workflow_gpu == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: projects/workflows/text2sql
-          file: projects/workflows/text2sql/images/Dockerfile.gpu
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/workflow-gpu:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/workflow-gpu:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/ml-platform/base-gpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/base-gpu:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -518,8 +166,80 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/executor-pool:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/executor-pool:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push ray-worker
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.ray_worker == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/ray/images/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/base-gpu:latest
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push training-llm
+        continue-on-error: true
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.training_llm == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/components/images/training-llm/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:latest
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/training-llm:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/training-llm:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # -- CPU stack: base-cpu -> executor-pool-cpu ---------------------------------
+  build-cpu-stack:
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes != '[]')
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push base-cpu
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.base_cpu == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/components/images/base-cpu/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/base-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/base-cpu:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -532,8 +252,117 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/executor-pool-cpu:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/executor-pool-cpu:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool-cpu:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # -- Independent images (no base-cpu/base-gpu dependency) --------------------
+  build-independent:
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes != '[]')
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push notebook-cpu
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_cpu == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/jupyter/images/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push gpu-idle-monitor
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.gpu_idle_monitor == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/jupyter/gpu-idle-monitor
+          file: projects/jupyter/gpu-idle-monitor/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/gpu-idle-monitor:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/gpu-idle-monitor:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push spark-base
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.spark_base == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/spark/images/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/spark-base:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/spark-base:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push text2sql-serve
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.text2sql_serve == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/workflows/text2sql/serve
+          file: projects/workflows/text2sql/serve/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/text2sql-serve:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/text2sql-serve:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push workflow-cpu
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.workflow_cpu == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/workflows/text2sql
+          file: projects/workflows/text2sql/images/Dockerfile.cpu
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/workflow-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/workflow-cpu:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push workflow-gpu
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.workflow_gpu == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/workflows/text2sql
+          file: projects/workflows/text2sql/images/Dockerfile.gpu
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/workflow-gpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/workflow-gpu:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -546,7 +375,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/remote-agent:latest
-            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO }}/remote-agent:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/ml-platform/remote-agent:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/remote-agent:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
