@@ -372,6 +372,7 @@ async def execute_remote(request: Request):
 
                     # Wait for pod ready — update display every 1s, check k8s every 5s.
                     # 600s allows for Karpenter node provisioning (~2-3 min cold start)
+                    _spin_chars = ["|", "/", "-", "\\"]
                     phase = "Pending"
                     wait_secs = 0
                     while wait_secs < 600:
@@ -389,10 +390,8 @@ async def execute_remote(request: Request):
                             except Exception:
                                 pass
                         # \r + ANSI erase-to-EOL; pad to >1KB to flush uvicorn buffer
-                        line = (
-                            f"\r\033[K[agent] Waiting for pod ready "
-                            f"(phase={phase}, {wait_secs}s)..."
-                        )
+                        spin = _spin_chars[wait_secs % len(_spin_chars)]
+                        line = f"\r\033[K[agent] Waiting for pod ready (phase={phase}) {spin}"
                         yield line.ljust(1200).encode()
                         await asyncio.sleep(1)
                         wait_secs += 1
