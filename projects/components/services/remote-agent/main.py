@@ -9,7 +9,6 @@ Phase 2: Pod Pool support — reuses warm containers to reduce cold-start latenc
 
 import asyncio
 import base64
-import hashlib
 import os
 import time
 import uuid
@@ -24,6 +23,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import StreamingResponse
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
+from pool_utils import compute_config_hash
 
 # Load Kubernetes config
 try:
@@ -65,22 +65,6 @@ class PodState:
 pod_pool: Dict[str, PodState] = {}
 pool_lock = asyncio.Lock()
 
-
-def compute_config_hash(config: dict) -> str:
-    """
-    Compute a hash of the execution config for pod matching.
-
-    Pods with the same config hash can be reused.
-    Hash is based on: image, gpu count, gpu_type, and sorted packages.
-    """
-    image = config.get("image", "")
-    gpu = config.get("gpu", 0)
-    gpu_type = config.get("gpu_type", "any")
-    packages = sorted(config.get("packages", []))
-
-    # Create deterministic hash string
-    hash_input = f"{image}:{gpu}:{gpu_type}:{','.join(packages)}"
-    return hashlib.sha256(hash_input.encode()).hexdigest()[:16]
 
 # Create FastAPI app
 app = FastAPI(
@@ -710,9 +694,7 @@ def _create_execution_job(
     else:
         default_image = "ml-platform/base-cpu:latest"
     image = config.get("image") or default_image
-    ecr_registry = os.getenv(
-        "ECR_REGISTRY", "805673386114.dkr.ecr.us-west-2.amazonaws.com"
-    )
+    ecr_registry = os.getenv("ECR_REGISTRY", "805673386114.dkr.ecr.us-west-2.amazonaws.com")
     # Prefix all ml-platform images with ECR registry
     if image.startswith("ml-platform/"):
         image = f"{ecr_registry}/{image}"
@@ -777,6 +759,14 @@ def _create_execution_job(
                     restart_policy="Never",
                     node_selector=node_selector if node_selector else None,
                     tolerations=tolerations if tolerations else None,
+                    volumes=[
+                        client.V1Volume(
+                            name="efs-storage",
+                            persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                                claim_name="efs-claim",
+                            ),
+                        ),
+                    ],
                     containers=[
                         client.V1Container(
                             name="executor",
@@ -787,6 +777,12 @@ def _create_execution_job(
                                 requests=resources_dict,
                                 limits=resources_dict,
                             ),
+                            volume_mounts=[
+                                client.V1VolumeMount(
+                                    name="efs-storage",
+                                    mount_path="/workspace",
+                                ),
+                            ],
                         )
                     ],
                 ),
@@ -798,9 +794,7 @@ def _create_execution_job(
     return batch_v1.create_namespaced_job(namespace=namespace, body=job)
 
 
-async def _wait_for_pod(
-    execution_id: str, namespace: str, timeout: int = 120
-) -> Optional[str]:
+async def _wait_for_pod(execution_id: str, namespace: str, timeout: int = 120) -> Optional[str]:
     """Wait for pod to be created and return its name."""
     deadline = time.time() + timeout
     while time.time() < deadline:
@@ -870,9 +864,7 @@ async def _stream_pod_logs(pod_name: str, namespace: str):
                     timestamps=False,
                 ):
                     if log_line:
-                        yield (
-                            log_line + "\n" if not log_line.endswith("\n") else log_line
-                        )
+                        yield (log_line + "\n" if not log_line.endswith("\n") else log_line)
                         await asyncio.sleep(0)
                 w.stop()
                 return
@@ -907,9 +899,7 @@ async def _wait_for_job_completion(execution_id: str, namespace: str, timeout: i
 
     while time.time() < deadline:
         try:
-            job = batch_v1.read_namespaced_job_status(
-                name=execution_id, namespace=namespace
-            )
+            job = batch_v1.read_namespaced_job_status(name=execution_id, namespace=namespace)
 
             # Check if job completed
             if job.status.succeeded:
