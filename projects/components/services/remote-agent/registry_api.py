@@ -168,28 +168,33 @@ def pull_recipe(
     try:
         registry = _get_registry()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            archive_path = registry.pull(
-                recipe_name=recipe_name,
-                version=version,
-                output_path=Path(tmpdir),
-            )
+        # Download to a named temp file (not auto-deleted)
+        tmpdir = tempfile.mkdtemp()
+        archive_path = registry.pull(
+            recipe_name=recipe_name,
+            version=version,
+            output_path=Path(tmpdir),
+        )
 
-            # Stream the file back to the client
-            def iterfile():
+        # Stream the file and clean up after
+        def iterfile():
+            try:
                 with open(archive_path, "rb") as f:
                     while chunk := f.read(64 * 1024):
                         yield chunk
+            finally:
+                import shutil
+                shutil.rmtree(tmpdir, ignore_errors=True)
 
-            return StreamingResponse(
-                iterfile(),
-                media_type="application/octet-stream",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{archive_path.name}"',
-                    "X-Recipe-Name": recipe_name,
-                    "X-Recipe-Version": version,
-                },
-            )
+        return StreamingResponse(
+            iterfile(),
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{archive_path.name}"',
+                "X-Recipe-Name": recipe_name,
+                "X-Recipe-Version": version,
+            },
+        )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
