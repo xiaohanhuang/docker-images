@@ -24,6 +24,7 @@ from fastapi.responses import StreamingResponse
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from pool_utils import compute_config_hash
+from registry_api import router as registry_router
 
 # Load Kubernetes config
 try:
@@ -72,6 +73,9 @@ app = FastAPI(
     description="Executes serialized Python functions on Kubernetes GPU pods",
     version="0.1.0",
 )
+
+# Include registry API routes
+app.include_router(registry_router)
 
 # Execution runner script that runs inside the GPU pod
 EXECUTION_RUNNER_SCRIPT = """
@@ -582,9 +586,7 @@ async def _create_executor_pod(
     return execution_id
 
 
-async def _wait_for_pod_ready(
-    pod_name: str, namespace: str, timeout: int = 120
-) -> Optional[str]:
+async def _wait_for_pod_ready(pod_name: str, namespace: str, timeout: int = 120) -> Optional[str]:
     """
     Wait for pod to be ready and return its IP.
 
