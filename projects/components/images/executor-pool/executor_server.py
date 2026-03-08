@@ -18,7 +18,15 @@ try:
 except ImportError:
     print("[EXECUTOR] Installing cloudpickle...")
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "-q", "--root-user-action=ignore", "cloudpickle"]
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "-q",
+            "--root-user-action=ignore",
+            "cloudpickle",
+        ]
     )
     import cloudpickle
 

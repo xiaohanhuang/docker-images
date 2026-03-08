@@ -43,7 +43,9 @@ batch_v1 = client.BatchV1Api()
 core_v1 = client.CoreV1Api()
 
 # Pod Pool Configuration
-POD_POOL_TTL_SECONDS = int(os.getenv("POD_POOL_TTL_SECONDS", "600"))  # 10 minutes default
+POD_POOL_TTL_SECONDS = int(
+    os.getenv("POD_POOL_TTL_SECONDS", "600")
+)  # 10 minutes default
 POD_POOL_ENABLED = os.getenv("POD_POOL_ENABLED", "true").lower() == "true"
 
 
@@ -65,6 +67,7 @@ class PodState:
 # In production, this could be Redis for HA across multiple agent replicas
 pod_pool: Dict[str, PodState] = {}
 pool_lock = asyncio.Lock()
+
 
 
 # Create FastAPI app
@@ -416,7 +419,9 @@ async def execute_remote(request: Request):
                     async with pool_lock:
                         if _pod_name in pod_pool:
                             pod_pool[_pod_name].status = "idle"
-                            pod_pool[_pod_name].last_used = datetime.utcnow().isoformat()
+                            pod_pool[_pod_name].last_used = (
+                                datetime.utcnow().isoformat()
+                            )
                     yield result.encode()
                 except Exception as e:
                     async with pool_lock:
@@ -449,7 +454,9 @@ async def execute_remote(request: Request):
 
                 # Wait for job completion
                 timeout_val = config.get("timeout", 3600)
-                await _wait_for_job_completion(execution_id, namespace, timeout=timeout_val)
+                await _wait_for_job_completion(
+                    execution_id, namespace, timeout=timeout_val
+                )
 
                 yield "\n[agent] Execution completed\n".encode()
 
@@ -522,7 +529,9 @@ async def _create_executor_pod(
             "it must run the executor HTTP server on :8080 (/health, /execute)"
         )
     image = user_image or default_image
-    ecr_registry = os.getenv("ECR_REGISTRY", "805673386114.dkr.ecr.us-west-2.amazonaws.com")
+    ecr_registry = os.getenv(
+        "ECR_REGISTRY", "805673386114.dkr.ecr.us-west-2.amazonaws.com"
+    )
     if image.startswith("ml-platform/"):
         image = f"{ecr_registry}/{image}"
 
@@ -607,7 +616,9 @@ async def _wait_for_pod_ready(pod_name: str, namespace: str, timeout: int = 120)
                             ready = True
                             break
                     if ready:
-                        print(f"[agent] Pod {pod_name} is ready with IP {pod.status.pod_ip}")
+                        print(
+                            f"[agent] Pod {pod_name} is ready with IP {pod.status.pod_ip}"
+                        )
                         return pod.status.pod_ip
 
         except Exception as e:
@@ -1026,7 +1037,9 @@ async def _reconcile_pool_on_startup():
                     namespace=namespace,
                 )
             recovered += 1
-            print(f"[agent] Startup: re-registered pool pod {name} (hash={config_hash}, ip={ip})")
+            print(
+                f"[agent] Startup: re-registered pool pod {name} (hash={config_hash}, ip={ip})"
+            )
         else:
             try:
                 await asyncio.to_thread(
@@ -1040,7 +1053,9 @@ async def _reconcile_pool_on_startup():
                 print(f"[agent] Startup: could not delete orphaned pod {name}: {e}")
 
     if recovered or deleted:
-        print(f"[agent] Startup reconcile: {recovered} re-registered, {deleted} deleted")
+        print(
+            f"[agent] Startup reconcile: {recovered} re-registered, {deleted} deleted"
+        )
 
 
 @app.on_event("startup")
