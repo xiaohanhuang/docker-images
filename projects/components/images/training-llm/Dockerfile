@@ -17,10 +17,8 @@
 # Parent: ray-worker
 # ============================================================
 
-ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
-ARG REPO=ml-platform
-ARG BASE_TAG=ray2.54-cu12.9-1.0.0
-FROM ${REGISTRY}/${REPO}/ray-worker:${BASE_TAG}
+ARG BASE_IMAGE=805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/ray-worker:latest
+FROM ${BASE_IMAGE}
 
 ARG TRANSFORMERS_VERSION=4.36.2
 ARG ACCELERATE_VERSION=0.25.0
