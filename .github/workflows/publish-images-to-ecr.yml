@@ -198,6 +198,7 @@ jobs:
           push: true
           build-args: |
             BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:latest
+            MLFLOW_VERSION=3.10.0
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/training-llm:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/training-llm:${{ github.sha }}

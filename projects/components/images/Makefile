@@ -188,9 +188,7 @@ build-genai-gpu: build-flyte-gpu
 
 build-training-llm: build-ray-worker
 	$(BUILDX) \
-	  --build-arg REGISTRY=$(REGISTRY) \
-	  --build-arg REPO=$(REPO) \
-	  --build-arg BASE_TAG=$(RAY_WORKER_TAG) \
+	  --build-arg BASE_IMAGE=$(RAY_WORKER_IMAGE) \
 	  --build-arg TRANSFORMERS_VERSION=$(TRANSFORMERS_VERSION) \
 	  --build-arg ACCELERATE_VERSION=$(ACCELERATE_VERSION) \
 	  --build-arg PEFT_VERSION=$(PEFT_VERSION) \
