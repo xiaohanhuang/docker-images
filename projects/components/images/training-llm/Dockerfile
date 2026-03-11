@@ -47,16 +47,4 @@ RUN pip install --no-cache-dir deepspeed==${DEEPSPEED_VERSION}
 # Flyte ↔ Ray plugin so this image can be used in Flyte RayJobConfig tasks
 RUN pip install --no-cache-dir flytekitplugins-ray==${FLYTE_RAY_PLUGIN}
 
-# OpenRLHF for distributed RLHF training with vLLM integration
-# Install OpenRLHF with vLLM backend support for distributed inference
-ARG OPENRLHF_VERSION=0.4.7
-ARG VLLM_VERSION=0.8.3
-
-RUN pip install --no-cache-dir \
-    openrlhf[vllm]==${OPENRLHF_VERSION} \
-    vllm==${VLLM_VERSION} \
-    redis==5.0.1 \
-    fastapi==0.115.6 \
-    uvicorn==0.34.0
-
 WORKDIR /root
