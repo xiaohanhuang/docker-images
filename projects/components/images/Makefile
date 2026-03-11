@@ -198,6 +198,7 @@ build-training-llm: build-ray-worker
 	  --build-arg BITSANDBYTES_VERSION=$(BITSANDBYTES_VERSION) \
 	  --build-arg DEEPSPEED_VERSION=$(DEEPSPEED_VERSION) \
 	  --build-arg FLYTE_RAY_PLUGIN=$(FLYTE_RAY_PLUGIN) \
+	  --build-arg MLFLOW_VERSION=$(MLFLOW_VERSION) \
 	  -t $(TRAINING_LLM_IMAGE) \
 	  training-llm/
 
