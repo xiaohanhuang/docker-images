@@ -5,6 +5,7 @@
 #   • transformers + peft + accelerate + datasets — fine-tuning
 #   • bitsandbytes  — 4/8-bit quantization
 #   • deepspeed     — ZeRO optimizer (JIT-compiled, not pre-built)
+#   • mlflow        — experiment tracking
 #   • einops + sentencepiece + protobuf — model utilities
 #   • flytekitplugins-ray — Flyte ↔ Ray integration
 #
@@ -28,6 +29,7 @@ ARG DATASETS_VERSION=2.16.1
 ARG BITSANDBYTES_VERSION=0.41.3
 ARG DEEPSPEED_VERSION=0.12.6
 ARG FLYTE_RAY_PLUGIN=1.14.3
+ARG MLFLOW_VERSION=2.13.0
 
 RUN pip install --no-cache-dir --ignore-installed \
     transformers==${TRANSFORMERS_VERSION} \
@@ -35,6 +37,7 @@ RUN pip install --no-cache-dir --ignore-installed \
     peft==${PEFT_VERSION} \
     datasets==${DATASETS_VERSION} \
     bitsandbytes==${BITSANDBYTES_VERSION} \
+    mlflow==${MLFLOW_VERSION} \
     scipy \
     einops \
     sentencepiece \
@@ -45,5 +48,17 @@ RUN pip install --no-cache-dir deepspeed==${DEEPSPEED_VERSION}
 
 # Flyte ↔ Ray plugin so this image can be used in Flyte RayJobConfig tasks
 RUN pip install --no-cache-dir flytekitplugins-ray==${FLYTE_RAY_PLUGIN}
+
+# OpenRLHF for distributed RLHF training with vLLM integration
+# Install OpenRLHF with vLLM backend support for distributed inference
+ARG OPENRLHF_VERSION=0.4.7
+ARG VLLM_VERSION=0.8.3
+
+RUN pip install --no-cache-dir \
+    openrlhf[vllm]==${OPENRLHF_VERSION} \
+    vllm==${VLLM_VERSION} \
+    redis==5.0.1 \
+    fastapi==0.115.6 \
+    uvicorn==0.34.0
 
 WORKDIR /root
