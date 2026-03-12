@@ -38,6 +38,9 @@ ARG MLFLOW_VERSION=3.10.0
 ARG OPENRLHF_VERSION=0.9.5
 ARG VLLM_VERSION=0.17.0
 
+# Remove distutils-installed blinker 1.4 (Ubuntu system pkg) that blocks pip uninstall
+RUN rm -rf /usr/lib/python3/dist-packages/blinker* || true
+
 RUN pip install --no-cache-dir \
     transformers==${TRANSFORMERS_VERSION} \
     accelerate==${ACCELERATE_VERSION} \
