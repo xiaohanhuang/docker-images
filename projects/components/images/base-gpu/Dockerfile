@@ -20,7 +20,13 @@ FROM nvidia/cuda:${CUDA_VERSION}-cudnn-runtime-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+
+# The NVIDIA *runtime* image ships libcudart.so.12 (versioned) but not the
+# unversioned libcudart.so symlink. bitsandbytes and vLLM probe for the
+# unversioned name during CUDA auto-detection, so we create it here.
+RUN ln -sf /usr/local/cuda/lib64/libcudart.so.12 /usr/local/cuda/lib64/libcudart.so
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

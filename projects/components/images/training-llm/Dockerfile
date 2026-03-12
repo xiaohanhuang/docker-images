@@ -21,6 +21,12 @@
 ARG BASE_IMAGE=805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/ray-worker:latest
 FROM ${BASE_IMAGE}
 
+# Ensure CUDA libraries are discoverable. The NVIDIA runtime base image sets
+# LD_LIBRARY_PATH to /usr/local/nvidia/lib64 but omits /usr/local/cuda/lib64.
+# bitsandbytes and vLLM need the unversioned libcudart.so symlink as well.
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+RUN ln -sf /usr/local/cuda/lib64/libcudart.so.12 /usr/local/cuda/lib64/libcudart.so
+
 ARG TRANSFORMERS_VERSION=5.3.0
 ARG ACCELERATE_VERSION=1.13.0
 ARG PEFT_VERSION=0.18.1
