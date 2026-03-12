@@ -38,7 +38,7 @@ ARG MLFLOW_VERSION=3.10.0
 ARG OPENRLHF_VERSION=0.9.5
 ARG VLLM_VERSION=0.17.0
 
-RUN pip install --no-cache-dir --ignore-installed \
+RUN pip install --no-cache-dir \
     transformers==${TRANSFORMERS_VERSION} \
     accelerate==${ACCELERATE_VERSION} \
     peft==${PEFT_VERSION} \
@@ -57,6 +57,11 @@ RUN pip install --no-cache-dir deepspeed==${DEEPSPEED_VERSION}
 RUN pip install --no-cache-dir flytekitplugins-ray==${FLYTE_RAY_PLUGIN}
 
 # OpenRLHF with vLLM backend for distributed RLHF training
-RUN pip install --no-cache-dir openrlhf==${OPENRLHF_VERSION} vllm==${VLLM_VERSION}
+# vllm: pre-built wheel with bundled flash-attention kernels
+# openrlhf: --no-deps skips flash-attn which needs NVCC (not in runtime image);
+#           all major deps (torch, transformers, deepspeed, ray) already present
+RUN pip install --no-cache-dir vllm==${VLLM_VERSION} && \
+    pip install --no-cache-dir --no-deps openrlhf==${OPENRLHF_VERSION} && \
+    pip install --no-cache-dir jsonlines
 
 WORKDIR /root
