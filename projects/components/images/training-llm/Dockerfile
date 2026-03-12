@@ -6,6 +6,7 @@
 #   • bitsandbytes  — 4/8-bit quantization
 #   • deepspeed     — ZeRO optimizer (JIT-compiled, not pre-built)
 #   • mlflow        — experiment tracking
+#   • openrlhf + vllm — distributed RLHF with vLLM inference
 #   • einops + sentencepiece + protobuf — model utilities
 #   • flytekitplugins-ray — Flyte ↔ Ray integration
 #
@@ -20,14 +21,16 @@
 ARG BASE_IMAGE=805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/ray-worker:latest
 FROM ${BASE_IMAGE}
 
-ARG TRANSFORMERS_VERSION=4.36.2
-ARG ACCELERATE_VERSION=0.25.0
-ARG PEFT_VERSION=0.7.1
-ARG DATASETS_VERSION=2.16.1
-ARG BITSANDBYTES_VERSION=0.41.3
-ARG DEEPSPEED_VERSION=0.12.6
-ARG FLYTE_RAY_PLUGIN=1.14.3
-ARG MLFLOW_VERSION=2.13.0
+ARG TRANSFORMERS_VERSION=5.3.0
+ARG ACCELERATE_VERSION=1.13.0
+ARG PEFT_VERSION=0.18.1
+ARG DATASETS_VERSION=4.6.1
+ARG BITSANDBYTES_VERSION=0.49.2
+ARG DEEPSPEED_VERSION=0.18.6
+ARG FLYTE_RAY_PLUGIN=1.16.14
+ARG MLFLOW_VERSION=3.10.0
+ARG OPENRLHF_VERSION=0.9.5
+ARG VLLM_VERSION=0.17.0
 
 RUN pip install --no-cache-dir --ignore-installed \
     transformers==${TRANSFORMERS_VERSION} \
@@ -46,5 +49,8 @@ RUN pip install --no-cache-dir deepspeed==${DEEPSPEED_VERSION}
 
 # Flyte ↔ Ray plugin so this image can be used in Flyte RayJobConfig tasks
 RUN pip install --no-cache-dir flytekitplugins-ray==${FLYTE_RAY_PLUGIN}
+
+# OpenRLHF with vLLM backend for distributed RLHF training
+RUN pip install --no-cache-dir openrlhf==${OPENRLHF_VERSION} vllm==${VLLM_VERSION}
 
 WORKDIR /root
