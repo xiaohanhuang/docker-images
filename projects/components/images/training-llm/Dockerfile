@@ -73,6 +73,6 @@ RUN pip install --no-cache-dir flytekitplugins-ray==${FLYTE_RAY_PLUGIN}
 #           all major deps (torch, transformers, deepspeed, ray) already present
 RUN pip install --no-cache-dir vllm==${VLLM_VERSION} && \
     pip install --no-cache-dir --no-deps openrlhf==${OPENRLHF_VERSION} && \
-    pip install --no-cache-dir jsonlines
+    pip install --no-cache-dir jsonlines pylatexenc
 
 WORKDIR /root
