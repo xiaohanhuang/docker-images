@@ -78,7 +78,7 @@ async def get_cost_report(
         dom = domain or remote.default_domain
 
         # Calculate time range
-        end_time = datetime.datetime.utcnow()
+        end_time = datetime.datetime.now(datetime.timezone.utc)
         start_time = end_time - datetime.timedelta(days=days)
 
         # List executions in the time range
