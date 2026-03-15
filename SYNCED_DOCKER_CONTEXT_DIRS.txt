@@ -12,6 +12,7 @@ projects/components/images/executor-pool
 projects/components/images/executor-pool-cpu
 projects/components/sdk
 projects/components/services/remote-agent
+projects/components/services/backend-api
 projects/jupyter/gpu-idle-monitor
 projects/jupyter/images
 projects/spark/images
