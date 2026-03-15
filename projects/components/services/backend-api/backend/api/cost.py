@@ -93,13 +93,23 @@ async def get_cost_report(
 
         for execution in executions:
             # Filter by time range
-            if execution.closure.created_at:
-                created_at = execution.closure.created_at.ToDatetime()
-                if created_at < start_time:
+            created = execution.closure.created_at
+            if created:
+                if hasattr(created, "ToDatetime"):
+                    created = created.ToDatetime()
+                if created < start_time:
                     continue
 
             # Calculate duration
-            duration = execution.closure.duration or datetime.timedelta(0)
+            dur = execution.closure.duration
+            if dur is None:
+                duration = datetime.timedelta(0)
+            elif hasattr(dur, "ToTimedelta"):
+                duration = dur.ToTimedelta()
+            elif isinstance(dur, datetime.timedelta):
+                duration = dur
+            else:
+                duration = datetime.timedelta(seconds=float(dur.seconds))
 
             # Estimate instance type (simplified - in production, query K8s)
             instance_type = "g5.xlarge"  # Default assumption
