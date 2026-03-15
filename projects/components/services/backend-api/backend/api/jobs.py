@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from flytekit.models.core.execution import WorkflowExecutionPhase
 from pydantic import BaseModel
 
-from backend.main import log_audit_event
+from backend.audit import log_audit_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
