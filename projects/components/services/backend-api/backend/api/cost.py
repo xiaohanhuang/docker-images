@@ -52,14 +52,14 @@ class FinOpsManager:
 
 def _get_flyte_remote():
     """Get Flyte remote client."""
-    from flytekit.configuration import Config
+    from flytekit.configuration import Config, PlatformConfig
     from flytekit.remote import FlyteRemote
 
     endpoint = os.getenv("FLYTE_ENDPOINT", "flyteadmin.ml-platform.internal:80")
     project = os.getenv("FLYTE_PROJECT", "flytesnacks")
     domain = os.getenv("FLYTE_DOMAIN", "development")
 
-    config = Config.auto(endpoint=endpoint)
+    config = Config(platform=PlatformConfig(endpoint=endpoint, insecure=True))
     return FlyteRemote(config=config, default_project=project, default_domain=domain)
 
 
