@@ -1,5 +1,5 @@
 # Marimo-enabled notebook image for the ML Platform
-# Based on quay.io/jupyter/pytorch-notebook which already has:
+# Bases on quay.io/jupyter/pytorch-notebook which already has:
 #   - CUDA runtime, cuDNN, PyTorch, JupyterLab
 # We add Marimo, Flyte/Ray/MLflow on top.
 FROM quay.io/jupyter/pytorch-notebook:python-3.12
@@ -17,24 +17,11 @@ USER ${NB_UID}
 
 # Install platform packages
 COPY projects/jupyter/images/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir \
-    flytekit==1.13.0 \
-    flytekitplugins-ray==1.13.0 \
-    "ray[default]==2.54.0" \
-    mlflow==2.14.0 \
-    transformers==4.41.2 \
-    datasets==2.21.0 \
-    peft==0.11.1 \
-    accelerate==0.31.0 \
-    nvitop \
-    jupyterlab-git \
-    ipywidgets \
-    torch-tb-profiler \
-    marimo
+RUN pip install --no-cache-dir -r /tmp/requirements.txt torch-tb-profiler marimo
 
 # Platform SDK
 COPY --chown=${NB_UID}:${NB_GID} projects/components/sdk /opt/ml-platform-sdk/
-RUN pip install --no-cache-dir -e /opt/ml-platform-sdk/
+RUN pip install --no-cache-dir --no-deps -e /opt/ml-platform-sdk/
 
 # Marimo runs on port 8888 by default (same as Jupyter)
 EXPOSE 8888
