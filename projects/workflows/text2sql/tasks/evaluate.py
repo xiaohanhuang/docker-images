@@ -13,7 +13,7 @@ from flytekit import Resources, task
 
 sys.path.insert(0, "/app")
 from config import (
-    CPU_IMAGE,
+    GPU_IMAGE,
     MAX_TARGET_LEN,
     MLFLOW_EXPERIMENT,
     MLFLOW_TRACKING_URI,
@@ -22,8 +22,8 @@ from config import (
 
 
 @task(
-    requests=Resources(cpu="4", mem="8Gi"),
-    container_image=CPU_IMAGE,
+    requests=Resources(cpu="2", mem="8Gi", gpu="1"),
+    container_image=GPU_IMAGE,
     environment={"MLFLOW_TRACKING_URI": MLFLOW_TRACKING_URI},
 )
 def evaluate(checkpoint_s3_path: str) -> dict:
@@ -73,7 +73,7 @@ def evaluate(checkpoint_s3_path: str) -> dict:
         model=model,
         tokenizer=tokenizer,
         max_new_tokens=MAX_TARGET_LEN,
-        device="cpu",
+        device="cuda",
     )
 
     # ── Load raw test data ────────────────────────────────────────────
