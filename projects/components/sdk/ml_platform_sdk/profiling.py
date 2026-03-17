@@ -33,6 +33,4 @@ def profile(output_dir: str = "/tmp/traces"):
         finally:
             print(f"Profiling complete. Traces saved to {output_dir}")
             # In a real scenario, you might upload to S3 here
-            print(
-                f"To upload to S3: aws s3 sync {output_dir} s3://my-bucket/profiles/{timestamp}"
-            )
+            print(f"To upload to S3: aws s3 sync {output_dir} s3://my-bucket/profiles/{timestamp}")

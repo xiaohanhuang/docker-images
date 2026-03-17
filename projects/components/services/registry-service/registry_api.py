@@ -10,21 +10,65 @@ The registry service runs in-cluster and connects to Postgres at
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
+import secrets
 import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Security,
+    UploadFile,
+)
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/registry", tags=["registry"])
+# Security: API Token Authentication
+API_TOKEN = os.getenv("REGISTRY_SERVICE_API_TOKEN")
+API_TOKEN_HASH = hashlib.sha256(API_TOKEN.encode()).hexdigest() if API_TOKEN else None
+
+_security = HTTPBearer(auto_error=False)
+
+
+def verify_api_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(_security),
+) -> bool:
+    """Verify Bearer token. No-op if REGISTRY_SERVICE_API_TOKEN is unset."""
+    if not API_TOKEN:
+        return True
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    provided_hash = hashlib.sha256(credentials.credentials.encode()).hexdigest()
+    if not secrets.compare_digest(provided_hash, API_TOKEN_HASH):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid API token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return True
+
+
+router = APIRouter(
+    prefix="/registry",
+    tags=["registry"],
+    dependencies=[Security(verify_api_token)],
+)
 
 # ── Postgres config (in-cluster defaults) ─────────────────────────────────
 
@@ -36,13 +80,9 @@ _PG_PASS = os.getenv("POSTGRES_PASSWORD", "")
 _S3_BUCKET = os.getenv("S3_BUCKET", "")
 
 if not _S3_BUCKET:
-    raise SystemExit(
-        "[registry] S3_BUCKET env var must be set"
-    )
+    raise SystemExit("[registry] S3_BUCKET env var must be set")
 if not _PG_PASS:
-    raise SystemExit(
-        "[registry] POSTGRES_PASSWORD env var must be set"
-    )
+    raise SystemExit("[registry] POSTGRES_PASSWORD env var must be set")
 
 
 def _get_registry():
@@ -133,9 +173,7 @@ async def push_recipe(
     # Stream upload into a per-request temp directory to avoid filename
     # collisions between concurrent uploads.
     tmpdir = tempfile.mkdtemp(prefix="registry-upload-")
-    with tempfile.NamedTemporaryFile(
-        suffix=".ml-plat", delete=False, dir=tmpdir
-    ) as tmp:
+    with tempfile.NamedTemporaryFile(suffix=".ml-plat", delete=False, dir=tmpdir) as tmp:
         shutil.copyfileobj(archive.file, tmp)
         tmp_path = Path(tmp.name)
 

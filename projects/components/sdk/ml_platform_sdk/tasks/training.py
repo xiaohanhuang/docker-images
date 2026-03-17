@@ -1,8 +1,11 @@
+import logging
 from typing import Any, Dict
 
 from flytekit import Resources, task
 from flytekit.types.directory import FlyteDirectory
 from flytekitplugins.ray import HeadNodeConfig, RayJobConfig, WorkerNodeConfig
+
+logger = logging.getLogger(__name__)
 
 # Define the Ray Cluster Config
 # This configures the ephemeral Ray cluster that Flyte spins up on K8s
@@ -63,9 +66,7 @@ ray_config = RayJobConfig(
     requests=Resources(cpu="2", mem="4Gi"),
     limits=Resources(cpu="2", mem="4Gi"),
 )
-def train_ray_task(
-    dataset_path: str, training_config: Dict[str, Any]
-) -> FlyteDirectory:
+def train_ray_task(dataset_path: str, training_config: Dict[str, Any]) -> FlyteDirectory:
     """
     A Ray task that runs distributed training.
     """
@@ -73,21 +74,25 @@ def train_ray_task(
     from ray.train.torch import TorchTrainer
 
     # This function runs on the Ray Head node (driver)
-    print(f"Starting training with config: {training_config}")
+    logger.info("Starting training with config: %s", training_config)
 
     # Define the training loop that runs on workers
     def train_func(config):
+        import logging
+
         # In a real scenario, imports should be here to ensure they are on workers
         import ray.train
 
+        logger = logging.getLogger(__name__)
+
         # Simulate training loop
-        print("Training started...")
+        logger.info("Training started...")
         # ... logic to load data from config["dataset_path"] ...
         # ... logic to init model ...
 
         # Report metrics
         ray.train.report({"loss": 0.01, "accuracy": 0.99})
-        print("Training finished.")
+        logger.info("Training finished.")
 
     # Configure scaling
     scaling_config = ScalingConfig(
@@ -102,7 +107,7 @@ def train_ray_task(
     )
 
     result = trainer.fit()
-    print(f"Training result: {result}")
+    logger.info("Training result: %s", result)
 
     # Return model checkpoint path (simulated)
     return FlyteDirectory(path="/tmp/checkpoint")

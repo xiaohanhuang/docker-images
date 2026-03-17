@@ -141,8 +141,6 @@ class TestEfsTaskDecorator:
         template = write_data.pod_template
         volumes = template.pod_spec.volumes
         pvc_names = [
-            v.persistent_volume_claim.claim_name
-            for v in volumes
-            if v.persistent_volume_claim
+            v.persistent_volume_claim.claim_name for v in volumes if v.persistent_volume_claim
         ]
         assert "custom-pvc" in pvc_names

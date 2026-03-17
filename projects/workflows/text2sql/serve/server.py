@@ -33,9 +33,7 @@ _s3 = boto3.client("s3")
 _ckpt_dir = tempfile.mkdtemp()
 
 paginator = _s3.get_paginator("list_objects_v2")
-for page in paginator.paginate(
-    Bucket=S3_BUCKET, Prefix=f"text2sql/checkpoints/{RUN_ID}/"
-):
+for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"text2sql/checkpoints/{RUN_ID}/"):
     for obj in page.get("Contents", []):
         key = obj["Key"]
         fname = key.split("/")[-1]
@@ -86,9 +84,7 @@ def predict(req: PredictRequest):
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="question cannot be empty")
     if not req.context.strip():
-        raise HTTPException(
-            status_code=400, detail="context (CREATE TABLE) cannot be empty"
-        )
+        raise HTTPException(status_code=400, detail="context (CREATE TABLE) cannot be empty")
 
     prompt = f"translate English to SQL: {req.question} </s> Tables: {req.context}"
     output = _pipe(prompt)[0]["generated_text"].strip()

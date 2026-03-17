@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: registry-service
+  namespace: default
+  labels:
+    app: registry-service
+spec:
+  replicas: 2  # For high availability
+  selector:
+    matchLabels:
+      app: registry-service
+  template:
+    metadata:
+      labels:
+        app: registry-service
+    spec:
+      serviceAccountName: registry-service
+      containers:
+        - name: registry
+          image: ml-platform/registry-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8081
+              name: http
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8081"
+            - name: POSTGRES_HOST
+              value: "postgres.postgres.svc.cluster.local"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "flyte"
+            - name: POSTGRES_USER
+              value: "flyte"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: S3_BUCKET
+              value: "ml-platform-data-ml-platform-eks-805673386114"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry-service
+  namespace: default
+  labels:
+    app: registry-service
+spec:
+  type: ClusterIP
+  selector:
+    app: registry-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+      protocol: TCP
+      name: http

@@ -9,7 +9,9 @@ Includes pod pool support for warm container reuse to reduce cold-start latency.
 
 import asyncio
 import base64
+import hashlib
 import os
+import secrets
 import time
 import uuid
 from dataclasses import dataclass
@@ -19,8 +21,9 @@ from typing import Dict, Optional
 import cloudpickle
 import requests
 import uvicorn
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, Security
 from fastapi.responses import StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from pool_utils import compute_config_hash
@@ -56,6 +59,36 @@ DEFAULT_POOL_CPU_TAG = "py3.12-1.1.0"
 
 if not ECR_REGISTRY:
     print("[execution] ⚠️  ECR_REGISTRY not set; ml-platform/* images will fail to pull")
+
+# Security: API Token Authentication
+# Set via EXECUTION_SERVICE_API_TOKEN env var.
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+API_TOKEN = os.getenv("EXECUTION_SERVICE_API_TOKEN")
+API_TOKEN_HASH = hashlib.sha256(API_TOKEN.encode()).hexdigest() if API_TOKEN else None
+
+security = HTTPBearer(auto_error=False)
+
+
+def verify_api_token(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(security),
+) -> bool:
+    """Verify Bearer token. No-op if EXECUTION_SERVICE_API_TOKEN is unset."""
+    if not API_TOKEN:
+        return True
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    provided_hash = hashlib.sha256(credentials.credentials.encode()).hexdigest()
+    if not secrets.compare_digest(provided_hash, API_TOKEN_HASH):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid API token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return True
 
 
 @dataclass
@@ -215,7 +248,10 @@ async def get_pool_stats():
 
 
 @app.post("/execute")
-async def execute_remote(request: Request):
+async def execute_remote(
+    request: Request,
+    authenticated: bool = Security(verify_api_token),
+):
     """
     Execute a serialized function on a GPU pod.
 
@@ -501,10 +537,8 @@ async def _create_executor_pod(
     if config.get("gpu", 0) > 0:
         node_selector["role"] = "gpu-worker"
         gpu_type = config.get("gpu_type", "any")
-        if gpu_type == "a10g":
-            node_selector["karpenter.k8s.aws/instance-gpu-name"] = "a10g"
-        elif gpu_type == "a100":
-            node_selector["karpenter.k8s.aws/instance-gpu-name"] = "a100"
+        if gpu_type != "any":
+            node_selector["karpenter.k8s.aws/instance-gpu-name"] = gpu_type
     else:
         node_selector["role"] = "cpu-worker"
 
@@ -683,10 +717,8 @@ def _create_execution_job(
     if config.get("gpu", 0) > 0:
         node_selector["role"] = "gpu-worker"
         gpu_type = config.get("gpu_type", "any")
-        if gpu_type == "a10g":
-            node_selector["karpenter.k8s.aws/instance-gpu-name"] = "a10g"
-        elif gpu_type == "a100":
-            node_selector["karpenter.k8s.aws/instance-gpu-name"] = "a100"
+        if gpu_type != "any":
+            node_selector["karpenter.k8s.aws/instance-gpu-name"] = gpu_type
 
     # GPU tolerations
     tolerations = []
@@ -874,7 +906,13 @@ async def _stream_pod_logs(pod_name: str, namespace: str):
                     timestamps=False,
                 ):
                     if log_line:
-                        yield (log_line + "\n" if not log_line.endswith("\n") else log_line)
+                        # _preload_content=False yields bytes
+                        line = (
+                            log_line.decode("utf-8", errors="replace")
+                            if isinstance(log_line, bytes)
+                            else log_line
+                        )
+                        yield (line + "\n" if not line.endswith("\n") else line)
                         await asyncio.sleep(0)
                 w.stop()
                 return

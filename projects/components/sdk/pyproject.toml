@@ -10,6 +10,8 @@ dependencies = [
     "flytekit",
     "mlflow",
     "boto3",
+    "kubernetes>=28.0",
+    "cloudpickle>=3.0.0",
 ]
 
 [project.optional-dependencies]

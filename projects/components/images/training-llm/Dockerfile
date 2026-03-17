@@ -56,14 +56,6 @@ RUN pip install --no-cache-dir \
 # DeepSpeed: install with lazy JIT compilation (DS_BUILD_OPS=1 breaks on CUDA 12.9.x at build time)
 RUN pip install --no-cache-dir deepspeed==${DEEPSPEED_VERSION}
 
-# DeepSpeed's import unconditionally calls `nvcc -V` to check CUDA compatibility.
-# The runtime base image doesn't ship nvcc, so we create a stub that reports the
-# version matching our CUDA toolkit. DS only parses "release X.Y" — no compilation.
-RUN mkdir -p /usr/local/cuda/bin && \
-    printf '#!/bin/sh\necho "nvcc: NVIDIA (R) Cuda compiler driver"\necho "Cuda compilation tools, release 12.9, V12.9.41"\n' \
-      > /usr/local/cuda/bin/nvcc && \
-    chmod +x /usr/local/cuda/bin/nvcc
-
 # Flyte ↔ Ray plugin so this image can be used in Flyte RayJobConfig tasks
 RUN pip install --no-cache-dir flytekitplugins-ray==${FLYTE_RAY_PLUGIN}
 
@@ -73,6 +65,8 @@ RUN pip install --no-cache-dir flytekitplugins-ray==${FLYTE_RAY_PLUGIN}
 #           all major deps (torch, transformers, deepspeed, ray) already present
 RUN pip install --no-cache-dir vllm==${VLLM_VERSION} && \
     pip install --no-cache-dir --no-deps openrlhf==${OPENRLHF_VERSION} && \
-    pip install --no-cache-dir jsonlines pylatexenc
+    pip install --no-cache-dir jsonlines pylatexenc loralib optimum optree \
+        pynvml sympy tensorboard torchdata torchmetrics \
+        transformers-stream-generator aiohttp
 
 WORKDIR /root

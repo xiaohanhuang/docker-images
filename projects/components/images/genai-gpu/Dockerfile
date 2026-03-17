@@ -6,10 +6,13 @@
 #   • langchain + community    — LLM orchestration
 #   • sentence-transformers    — embedding models
 #   • openai (client)          — OpenAI-compatible API calls
+#   • anthropic (client)       — Anthropic API calls
 #   • tiktoken                 — BPE tokenizer
 #   • faiss-cpu                — similarity search (CPU)
 #   • chromadb                 — in-process vector store
 #   • psycopg2-binary + pgvector — PostgreSQL vector store
+#   • mlflow                    — experiment tracking (for evaluation components)
+#   • pandas                    — data manipulation (for MLflow table logging)
 #
 # Used by: components/genai/*  (vector_store_indexer, etc.)
 #
@@ -28,11 +31,14 @@ ARG LANGCHAIN_VERSION=0.2.5
 ARG LANGCHAIN_COMMUNITY_VERSION=0.2.5
 ARG SENTENCE_TRANSFORMERS_VERSION=3.0.1
 ARG OPENAI_VERSION=1.34.0
+ARG ANTHROPIC_VERSION=0.39.0
 ARG TIKTOKEN_VERSION=0.7.0
 ARG FAISS_VERSION=1.8.0
 ARG CHROMADB_VERSION=0.4.24
 ARG PSYCOPG2_VERSION=2.9.9
 ARG PGVECTOR_VERSION=0.3.5
+ARG MLFLOW_VERSION=2.13.0
+ARG PANDAS_VERSION=2.2.2
 
 RUN pip install --no-cache-dir --ignore-installed \
     vllm==${VLLM_VERSION} \
@@ -40,10 +46,13 @@ RUN pip install --no-cache-dir --ignore-installed \
     langchain-community==${LANGCHAIN_COMMUNITY_VERSION} \
     sentence-transformers==${SENTENCE_TRANSFORMERS_VERSION} \
     openai==${OPENAI_VERSION} \
+    anthropic==${ANTHROPIC_VERSION} \
     tiktoken==${TIKTOKEN_VERSION} \
     faiss-cpu==${FAISS_VERSION} \
     chromadb==${CHROMADB_VERSION} \
     psycopg2-binary==${PSYCOPG2_VERSION} \
-    pgvector==${PGVECTOR_VERSION}
+    pgvector==${PGVECTOR_VERSION} \
+    mlflow==${MLFLOW_VERSION} \
+    pandas==${PANDAS_VERSION}
 
 WORKDIR /root
