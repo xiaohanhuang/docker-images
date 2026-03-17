@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages — keep minimal for CPU tasks (ingest, preprocess,
-# register_model). No torch, Ray, accelerate, or Spark deps needed.
+# evaluate, register_model). No Ray, accelerate, or Spark deps needed.
 # All versions pinned to avoid pip ResolutionTooDeep errors and ensure
 # reproducible builds.
 RUN pip install --no-cache-dir \

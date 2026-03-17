@@ -42,9 +42,7 @@ class TestGetJupyterActivity:
 
     def test_busy_kernel_returns_true(self):
         with patch("requests.get") as mock_get:
-            mock_get.return_value = self._resp(
-                [{"id": "k1", "execution_state": "busy"}]
-            )
+            mock_get.return_value = self._resp([{"id": "k1", "execution_state": "busy"}])
             assert idle_monitor.get_jupyter_activity("tok") is True
 
     def test_idle_kernel_no_terminals_returns_false(self):
@@ -189,3 +187,62 @@ class TestDeletePod:
                     with caplog.at_level("ERROR"):
                         idle_monitor.delete_pod()
                     assert "Failed to delete pod" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# get_marimo_activity
+# ---------------------------------------------------------------------------
+
+
+class TestGetMarimoActivity:
+    def _resp(self, data, status=200):
+        r = MagicMock()
+        r.status_code = status
+        r.json.return_value = data
+        return r
+
+    def test_active_sessions_returns_true(self):
+        with patch("requests.get") as mock_get:
+            mock_get.return_value = self._resp({"sessions": [{"id": "s1"}]})
+            assert idle_monitor.get_marimo_activity() is True
+
+    def test_no_sessions_returns_false(self):
+        with patch("requests.get") as mock_get:
+            mock_get.return_value = self._resp({"sessions": []})
+            assert idle_monitor.get_marimo_activity() is False
+
+    def test_missing_sessions_key_returns_false(self):
+        with patch("requests.get") as mock_get:
+            mock_get.return_value = self._resp({})
+            assert idle_monitor.get_marimo_activity() is False
+
+    def test_request_error_returns_false(self):
+        with patch("requests.get", side_effect=req_lib.ConnectionError("refused")):
+            assert idle_monitor.get_marimo_activity() is False
+
+
+# ---------------------------------------------------------------------------
+# is_active with Marimo mode
+# ---------------------------------------------------------------------------
+
+
+class TestIsActiveMarimo:
+    def test_marimo_mode_checks_marimo_activity(self):
+        with patch.object(idle_monitor, "MARIMO_MODE", True):
+            with patch.object(idle_monitor, "get_marimo_activity", return_value=True):
+                with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
+                    assert idle_monitor.is_active("") is True
+
+    def test_marimo_mode_inactive(self):
+        with patch.object(idle_monitor, "MARIMO_MODE", True):
+            with patch.object(idle_monitor, "get_marimo_activity", return_value=False):
+                with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
+                    assert idle_monitor.is_active("") is False
+
+    def test_jupyter_mode_does_not_check_marimo(self):
+        with patch.object(idle_monitor, "MARIMO_MODE", False):
+            with patch.object(idle_monitor, "get_jupyter_activity", return_value=False):
+                with patch.object(idle_monitor, "get_marimo_activity") as mock_marimo:
+                    with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
+                        idle_monitor.is_active("tok")
+                        mock_marimo.assert_not_called()

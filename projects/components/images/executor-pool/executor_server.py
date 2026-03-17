@@ -18,15 +18,7 @@ try:
 except ImportError:
     print("[EXECUTOR] Installing cloudpickle...")
     subprocess.check_call(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "-q",
-            "--root-user-action=ignore",
-            "cloudpickle",
-        ]
+        [sys.executable, "-m", "pip", "install", "-q", "--root-user-action=ignore", "cloudpickle"]
     )
     import cloudpickle
 
@@ -126,11 +118,13 @@ def execute():
         error_bytes = cloudpickle.dumps(error_dict)
         error_b64 = base64.b64encode(error_bytes).decode()
 
-        return jsonify({
-            "success": False,
-            "result": error_b64,
-            "stdout": f"[EXECUTOR] \u274c Execution failed: {e}\n{tb_str}",
-        })
+        return jsonify(
+            {
+                "success": False,
+                "result": error_b64,
+                "stdout": f"[EXECUTOR] \u274c Execution failed: {e}\n{tb_str}",
+            }
+        )
 
 
 if __name__ == "__main__":

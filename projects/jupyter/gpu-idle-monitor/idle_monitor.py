@@ -38,6 +38,7 @@ IDLE_THRESHOLD_SECONDS = int(os.environ.get("IDLE_THRESHOLD_SECONDS", "1800"))
 CHECK_INTERVAL_SECONDS = int(os.environ.get("CHECK_INTERVAL_SECONDS", "60"))
 POD_NAME = os.environ.get("POD_NAME", "")
 POD_NAMESPACE = os.environ.get("POD_NAMESPACE", "jupyter")
+MARIMO_MODE = os.environ.get("MARIMO_MODE", "false").lower() == "true"
 
 # SSH port in upper-case hex as it appears in /proc/net/tcp local_address field
 _SSH_PORT_HEX = "0016"
@@ -89,6 +90,28 @@ def get_jupyter_activity(token: str = "") -> bool:
     return False
 
 
+def get_marimo_activity() -> bool:
+    """Return True if Marimo server reports active sessions or running kernels.
+
+    Marimo exposes a health endpoint and session information. We check if there are
+    any active sessions or if the server is processing requests.
+    """
+    try:
+        # Marimo typically runs on port 8888 and has an API for session management
+        # Check if there are any active WebSocket connections or running cells
+        resp = requests.get(f"{JUPYTER_URL}/api/status", timeout=5)
+        if resp.status_code == 200:
+            status = resp.json()
+            # If Marimo reports any active sessions, consider it busy
+            if status.get("sessions") and len(status.get("sessions", [])) > 0:
+                log.info("Active Marimo sessions detected: %d", len(status["sessions"]))
+                return True
+    except requests.RequestException as exc:
+        log.debug("Could not reach Marimo API: %s", exc)
+
+    return False
+
+
 def get_ssh_connections(proc_net_tcp_path: str = "/proc/net/tcp") -> int:
     """Return the number of established SSH connections from ``/proc/net/tcp``.
 
@@ -122,11 +145,16 @@ def is_active(token: str = "") -> bool:
     """Return True if any user activity is detected on the pod.
 
     Checks (in order):
-    1. Jupyter busy kernels or open terminals via the REST API.
-    2. Established SSH connections via ``/proc/net/tcp``.
+    1. Jupyter busy kernels or open terminals via the REST API (if not in Marimo mode).
+    2. Marimo active sessions (if in Marimo mode).
+    3. Established SSH connections via ``/proc/net/tcp``.
     """
-    if get_jupyter_activity(token):
-        return True
+    if MARIMO_MODE:
+        if get_marimo_activity():
+            return True
+    else:
+        if get_jupyter_activity(token):
+            return True
     ssh_count = get_ssh_connections()
     if ssh_count > 0:
         log.info("Active SSH connections: %d", ssh_count)
@@ -150,9 +178,11 @@ def delete_pod() -> None:
 
 def run() -> None:
     """Main monitoring loop."""
+    mode = "Marimo" if MARIMO_MODE else "Jupyter"
     log.info(
-        "GPU idle-shutdown monitor started — idle threshold: %ds, "
+        "GPU idle-shutdown monitor started (mode: %s) — idle threshold: %ds, "
         "check interval: %ds, pod: %s/%s",
+        mode,
         IDLE_THRESHOLD_SECONDS,
         CHECK_INTERVAL_SECONDS,
         POD_NAMESPACE,

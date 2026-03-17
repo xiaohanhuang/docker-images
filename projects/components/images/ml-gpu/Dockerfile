@@ -43,7 +43,9 @@ RUN pip install --no-cache-dir \
     scikit-learn==${SKLEARN_VERSION} \
     evaluate==${EVALUATE_VERSION} \
     rouge-score==${ROUGE_VERSION} \
-    sentencepiece==${SENTENCEPIECE_VERSION}
+    sentencepiece==${SENTENCEPIECE_VERSION} \
+    boto3 \
+    s3fs
 
 # openrlhf: --no-deps skips flash-attn which needs NVCC (not in runtime image);
 # all major deps (torch, transformers, deepspeed, ray) already present above.

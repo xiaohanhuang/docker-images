@@ -78,5 +78,14 @@ RUN pip install --no-cache-dir \
 # Install cloudpickle for @remote decorator support
 RUN pip install --no-cache-dir cloudpickle
 
+# Install commonly used ML packages to reduce cold-start latency
+# These packages are frequently requested and have long install times
+RUN pip install --no-cache-dir \
+    transformers==4.48.3 \
+    accelerate==1.5.2 \
+    datasets==3.5.0 \
+    peft==0.15.2 \
+    bitsandbytes==0.45.5
+
 # Verify install
 RUN python -c "import torch; print(torch.__version__, torch.cuda.is_available())"

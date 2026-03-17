@@ -47,8 +47,9 @@ jobs:
       text2sql_serve: ${{ steps.changes.outputs.text2sql_serve }}
       workflow_cpu: ${{ steps.changes.outputs.workflow_cpu }}
       workflow_gpu: ${{ steps.changes.outputs.workflow_gpu }}
-      remote_agent: ${{ steps.changes.outputs.remote_agent }}
-      backend_api: ${{ steps.changes.outputs.backend_api }}
+      execution_service: ${{ steps.changes.outputs.execution_service }}
+      registry_service: ${{ steps.changes.outputs.registry_service }}
+      backend: ${{ steps.changes.outputs.backend }}
 
     steps:
       - uses: actions/checkout@v4
@@ -117,10 +118,15 @@ jobs:
               - 'projects/workflows/text2sql/config.py'
               - 'projects/workflows/text2sql/tasks/**'
               - 'projects/workflows/text2sql/pipeline.py'
-            remote_agent:
-              - 'projects/components/services/remote-agent/**'
-            backend_api:
-              - 'projects/components/services/backend-api/**'
+            execution_service:
+              - 'projects/components/services/execution-service/**'
+            registry_service:
+              - 'projects/components/services/registry-service/**'
+            backend:
+              - 'projects/backend/**'
+              - 'backend/**'
+              - 'cli/**'
+              - 'pyproject.toml'
 
   skip:
     runs-on: ubuntu-latest
@@ -413,26 +419,40 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push remote-agent
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.remote_agent == 'true'
+      - name: Build and push execution-service
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.execution_service == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: projects/components/services/remote-agent
-          file: projects/components/services/remote-agent/Dockerfile
+          context: projects/components/services/execution-service
+          file: projects/components/services/execution-service/Dockerfile
           platforms: linux/amd64
           push: true
           tags: |
-            ${{ env.ECR_REGISTRY }}/ml-platform/remote-agent:latest
-            ${{ env.ECR_REGISTRY }}/ml-platform/remote-agent:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/ml-platform/execution-service:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/execution-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push backend-api
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.backend_api == 'true'
+      - name: Build and push registry-service
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.registry_service == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: projects/components/services/backend-api
-          file: projects/components/services/backend-api/Dockerfile
+          context: projects/components/services/registry-service
+          file: projects/components/services/registry-service/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/registry-service:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/registry-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push backend
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.backend == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: projects/backend/Dockerfile
           platforms: linux/amd64
           push: true
           tags: |
