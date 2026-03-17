@@ -17,7 +17,7 @@ USER ${NB_UID}
 
 # Install platform packages
 COPY projects/jupyter/images/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt torch-tb-profiler marimo jupyter-server-proxy jupyter-server-proxy
+RUN pip install --no-cache-dir -r /tmp/requirements.txt torch-tb-profiler marimo jupyter-server-proxy
 
 # Platform SDK
 COPY --chown=${NB_UID}:${NB_GID} projects/components/sdk /opt/ml-platform-sdk/
