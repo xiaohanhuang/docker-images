@@ -17,6 +17,6 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 # Pre-install the platform SDK
 COPY --chown=${NB_UID}:${NB_GID} projects/components/sdk /home/jovyan/ml-platform-sdk/
-RUN pip install -e /home/jovyan/ml-platform-sdk/
+RUN pip install --no-cache-dir --no-deps -e /home/jovyan/ml-platform-sdk/
 
 WORKDIR /home/jovyan/work
