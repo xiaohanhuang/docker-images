@@ -76,7 +76,7 @@ export default function OverviewPage() {
               <p className="text-gray-500 text-sm">No active GPU pods</p>
             ) : (
               <div className="space-y-3">
-                {gpuPods.slice(0, 5).map((pod) => (
+                {gpuPods.slice(0, 5).map((pod: any) => (
                   <div key={pod.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{pod.name}</p>
@@ -102,7 +102,7 @@ export default function OverviewPage() {
               <p className="text-gray-500 text-sm">No recent executions</p>
             ) : (
               <div className="space-y-3">
-                {recentJobs.slice(0, 5).map((job) => (
+                {recentJobs.slice(0, 5).map((job: any) => (
                   <div key={job.job_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{job.workflow}</p>

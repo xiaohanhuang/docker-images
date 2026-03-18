@@ -129,7 +129,7 @@ export default function KubernetesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {pods?.map((pod) => (
+                {pods?.map((pod: any) => (
                   <tr key={pod.name} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedPod(pod.name)}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {pod.name}

@@ -1,27 +1,25 @@
-.PHONY: build push deploy install clean
+# Makefile for ML Platform Dashboard
+# NOTE: Docker image builds are handled by CI in xiaohanhuang/docker-images.
+# Pushing to main auto-syncs projects/dashboard/ to that repo, which then
+# builds and pushes ml-platform/dashboard:latest to ECR via GitHub Actions.
+# This Makefile only manages local development and Kubernetes deployment.
+
+.PHONY: dev deploy install clean logs status
 
 ECR_REGISTRY ?= 805673386114.dkr.ecr.us-west-2.amazonaws.com
 IMAGE_NAME = ml-platform/dashboard
 IMAGE_TAG ?= latest
 
-build:
-	@echo "Building dashboard Docker image..."
-	docker build -t $(IMAGE_NAME):$(IMAGE_TAG) \
-		-f Dockerfile \
-		../../
-
-push: build
-	@echo "Pushing dashboard image to ECR..."
-	aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin $(ECR_REGISTRY)
-	docker tag $(IMAGE_NAME):$(IMAGE_TAG) $(ECR_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
-	docker push $(ECR_REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
+dev:
+	@echo "Starting local dev server..."
+	npm run dev
 
 deploy:
 	@echo "Deploying dashboard to Kubernetes..."
 	kubectl apply -f deployment.yaml
 
-install: push deploy
-	@echo "Dashboard installed successfully"
+install: deploy
+	@echo "Dashboard deployed (image built by CI in xiaohanhuang/docker-images)"
 
 clean:
 	@echo "Cleaning up..."
