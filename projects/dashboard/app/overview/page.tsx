@@ -34,8 +34,8 @@ export default function OverviewPage() {
     return <ErrorMessage message="Failed to load overview data" />;
   }
 
-  const activePods = pods?.filter((p) => p.status === 'Running') || [];
-  const gpuPods = activePods.filter((p) => p.gpu);
+  const activePods = pods?.filter((p: any) => p.status === 'Running') || [];
+  const gpuPods = activePods.filter((p: any) => p.gpu);
   const recentJobs = jobs || [];
   const totalCost = costReport?.total_cost || 0;
 
