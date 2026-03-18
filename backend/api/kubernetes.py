@@ -31,7 +31,7 @@ async def list_nodes() -> list[dict[str, Any]]:
         List of node information
     """
     try:
-        nodes = v1.list_node()
+        nodes = v1.list_node(_request_timeout=10)
         node_list = []
 
         for node in nodes.items:
@@ -75,9 +75,9 @@ async def list_events(namespace: str | None = Query(None)) -> list[dict[str, Any
     """
     try:
         if namespace:
-            events = v1.list_namespaced_event(namespace)
+            events = v1.list_namespaced_event(namespace, _request_timeout=10)
         else:
-            events = v1.list_event_for_all_namespaces()
+            events = v1.list_event_for_all_namespaces(_request_timeout=10)
 
         event_list = []
         for event in events.items:

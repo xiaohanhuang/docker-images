@@ -169,9 +169,13 @@ async def list_pods(
         v1 = client.CoreV1Api()
 
         if all_namespaces:
-            pods = v1.list_pod_for_all_namespaces(label_selector="app=interactive-pod")
+            pods = v1.list_pod_for_all_namespaces(
+                label_selector="app=interactive-pod", _request_timeout=10
+            )
         else:
-            pods = v1.list_namespaced_pod(namespace, label_selector="app=interactive-pod")
+            pods = v1.list_namespaced_pod(
+                namespace, label_selector="app=interactive-pod", _request_timeout=10
+            )
 
         result = []
         for pod in pods.items:
