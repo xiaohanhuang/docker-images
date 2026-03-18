@@ -56,7 +56,7 @@ export default function PipelinesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {jobs?.map((job) => (
+                {jobs?.map((job: any) => (
                   <tr key={job.job_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {job.job_id}
