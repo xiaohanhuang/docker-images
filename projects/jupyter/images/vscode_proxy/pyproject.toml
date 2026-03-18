@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vscode-proxy"
+version = "0.1.0"
+description = "Jupyter Server Proxy entry for VS Code (code-server)"
+
+[project.entry-points.jupyter_serverproxy_servers]
+vscode = "vscode_proxy:setup_vscode"
