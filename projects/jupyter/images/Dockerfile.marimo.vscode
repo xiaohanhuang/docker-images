@@ -1,0 +1,14 @@
+# Image that adds VS Code Server on top of the Marimo-enabled image
+FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo:latest
+
+USER root
+
+# Install code-server
+RUN curl -fsSL https://code-server.dev/install.sh | sh
+
+USER ${NB_UID}
+
+# Install jupyter-codeserver-proxy to integrate VS Code into JupyterLab launcher
+RUN pip install --no-cache-dir jupyter-server-proxy jupyter-codeserver-proxy
+
+EXPOSE 8888
