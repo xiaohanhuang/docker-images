@@ -1,20 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <mask id="mask" fill="#fff">
-    <path d="M70.9 97.8L30.7 82.5L2.4 61.6c-1.6-1.2-2.3-3.3-1.8-5.3L8.2 27.9c.4-1.5 1.2-2.8 2.4-3.7L63.5 0l7.4 3.2c2.7 1.2 4.5 3.8 4.5 6.8v80.9c0 3-1.8 5.7-4.5 6.9z" fill-rule="evenodd" clip-rule="evenodd"/>
-  </mask>
-  <g mask="url(#mask)">
-    <path d="M70.9 97.8L30.7 82.5L2.4 61.6c-1.6-1.2-2.3-3.3-1.8-5.3L8.2 27.9c.4-1.5 1.2-2.8 2.4-3.7L63.5 0l7.4 3.2c2.7 1.2 4.5 3.8 4.5 6.8v80.9c0 3-1.8 5.7-4.5 6.9z" fill="#0065A9"/>
-    <g transform="translate(-.4 .1)">
-      <path d="M46.1 63.6L28.7 80.2 8.3 61.6c-1.2-.9-1.8-2.5-1.5-4l.1-.3 39.2 6.3z" fill="#007ACC"/>
-      <path d="M70.9 97.8l-24.8-10.4L8.2 27.9l2.4-3.7L63.5 0l7.4 3.2c2.7 1.2 4.5 3.8 4.5 6.8v80.9c0 2.9-1.8 5.6-4.5 6.9z" fill="#1F9CF0"/>
-      <path d="M46.1 63.6L28.7 80.2v-37l17.4 20.4z" fill="none" opacity=".25"/>
-    </g>
-    <path d="M75.4 91v-82c0-3-1.8-5.7-4.5-6.9L63.5.1 10.6 24.2c-1.2.9-2 2.2-2.4 3.7L.6 56.3c-.5 2 .2 4 1.8 5.3l28.3 20.9L70.9 97.8c2.7-1.1 4.5-3.8 4.5-6.8z" fill="url(#grad)" opacity=".25"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
   <defs>
-    <linearGradient id="grad" x1="37.8" y1="0" x2="37.8" y2="100" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fff"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2196F3"/>
+      <stop offset="1" stop-color="#0065A9"/>
     </linearGradient>
   </defs>
+  <rect width="100" height="100" rx="16" fill="url(#bg)"/>
+  <g transform="translate(12,15) scale(0.76)">
+    <path d="M71.4 2.9L71.4 2.9c2.3 1 3.8 3.3 3.8 5.8v82.6c0 2.5-1.5 4.8-3.8 5.8l-6.2 2.7c-1.2.5-2.4.3-3.4-.3L22.5 65.4 9.8 75.2c-1.2 1-3 .9-4.1-.1L1.5 71c-1.1-1.1-1.1-2.9 0-4L13 55.5V44.5L1.5 33c-1.1-1.1-1.1-2.9 0-4l4.2-4.1c1.1-1.1 2.9-1.1 4.1-.1L22.5 34.6 61.8 .5c1-.6 2.2-.8 3.4-.3L71.4 2.9zM62 75.1V24.9L30.3 50 62 75.1z" fill="white"/>
+  </g>
 </svg>
