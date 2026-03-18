@@ -8,7 +8,8 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 
 USER ${NB_UID}
 
-# Install jupyter-codeserver-proxy to integrate VS Code into JupyterLab launcher
-RUN pip install --no-cache-dir jupyter-server-proxy jupyter-codeserver-proxy
+# VS Code proxy entry (registers VS Code in JupyterLab launcher)
+COPY --chown=${NB_UID}:${NB_GID} projects/jupyter/images/vscode_proxy /opt/vscode-proxy/
+RUN pip install --no-cache-dir --no-deps /opt/vscode-proxy/
 
 EXPOSE 8888

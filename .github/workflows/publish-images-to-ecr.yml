@@ -106,6 +106,7 @@ jobs:
               - 'projects/components/sdk/**'
             notebook_marimo_vscode:
               - 'projects/jupyter/images/Dockerfile.marimo.vscode'
+              - 'projects/jupyter/images/vscode_proxy/**'
               - 'projects/jupyter/images/requirements.txt'
               - 'projects/components/sdk/**'
             gpu_idle_monitor:
