@@ -1,10 +1,10 @@
 # Image that adds VS Code Server on top of the Marimo-enabled image
-FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo:latest
+FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo:7d81415fad9abc3dea9d0a12f5979d03cba1cdd3
 
 USER root
 
-# Install code-server
-RUN curl -fsSL https://code-server.dev/install.sh | sh
+# Install code-server (pinned version for reproducibility)
+RUN curl -fsSL https://code-server.dev/install.sh | sh -s -- --version 4.111.0
 
 USER ${NB_UID}
 
