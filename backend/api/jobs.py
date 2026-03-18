@@ -133,8 +133,8 @@ async def list_jobs(
         return {"jobs": result}
 
     except Exception as e:
-        logger.error(f"Failed to list jobs: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Failed to list jobs (Flyte may be unavailable): {e}")
+        return {"jobs": []}
 
 
 @router.get("/{job_id}")

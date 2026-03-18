@@ -4,7 +4,7 @@ import datetime
 import logging
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -137,5 +137,13 @@ async def get_cost_report(
         )
 
     except Exception as e:
-        logger.error(f"Failed to generate cost report: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Failed to generate cost report (Flyte may be unavailable): {e}")
+        import datetime as _dt
+
+        _now = _dt.datetime.now(_dt.timezone.utc)
+        return CostReport(
+            total_cost=0.0,
+            period_start=(_now - _dt.timedelta(days=days)).isoformat(),
+            period_end=_now.isoformat(),
+            jobs=[],
+        )

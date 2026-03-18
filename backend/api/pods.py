@@ -198,8 +198,8 @@ async def list_pods(
         return {"pods": result}
 
     except Exception as e:
-        logger.error(f"Failed to list pods: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning(f"Failed to list pods: {e}")
+        return {"pods": []}
 
 
 @router.delete("/{pod_name}")
