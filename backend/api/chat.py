@@ -24,6 +24,7 @@ _pinned_widgets: dict[str, dict[str, Any]] = {}
 
 
 @router.post("/")
+@router.post("")
 async def chat(request: Request, body: ChatRequest):
     """Chat endpoint — returns an SSE stream with text and optional widget.
 

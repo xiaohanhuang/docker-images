@@ -32,6 +32,7 @@ app = FastAPI(
     description="Backend API for ml-platform CLI operations",
     version="0.1.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # Configure CORS – restrict origins in production via CORS_ALLOWED_ORIGINS env var
