@@ -29,15 +29,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-images-to-ecr-${{ github.ref }}-${{ github.event_name }}-${{ 
-    inputs.force }}
+  group: publish-images-to-ecr-${{ github.ref }}-${{ github.event_name }}-${{ inputs.force }}
   cancel-in-progress: true
 
 env:
   AWS_REGION: us-west-2
   # Update these to your AWS account / ECR registry.
-  AWS_ROLE_ARN: 
-    arn:aws:iam::805673386114:role/github-actions-ecr-push-ml-platform-eks
+  AWS_ROLE_ARN: arn:aws:iam::805673386114:role/github-actions-ecr-push-ml-platform-eks
   ECR_REGISTRY: 805673386114.dkr.ecr.us-west-2.amazonaws.com
 
 jobs:
@@ -56,8 +54,7 @@ jobs:
       ml_gpu: ${{ steps.changes.outputs.ml_gpu }}
       notebook_cpu: ${{ steps.changes.outputs.notebook_cpu }}
       notebook_marimo: ${{ steps.changes.outputs.notebook_marimo }}
-      notebook_marimo_vscode: ${{ steps.changes.outputs.notebook_marimo_vscode 
-        }}
+      notebook_marimo_vscode: ${{ steps.changes.outputs.notebook_marimo_vscode }}
       gpu_idle_monitor: ${{ steps.changes.outputs.gpu_idle_monitor }}
       spark_base: ${{ steps.changes.outputs.spark_base }}
       text2sql_serve: ${{ steps.changes.outputs.text2sql_serve }}
@@ -79,6 +76,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             if [[ "${{ inputs.force }}" == "true" ]]; then
               echo "mode=force" >> "$GITHUB_OUTPUT"
+            elif [[ -n "${{ inputs.only_images }}" ]]; then
+              echo "mode=auto" >> "$GITHUB_OUTPUT"
             else
               echo "mode=skip" >> "$GITHUB_OUTPUT"
             fi
@@ -162,19 +161,16 @@ jobs:
   skip:
     runs-on: ubuntu-latest
     needs: detect
-    if: needs.detect.outputs.mode == 'skip' || (needs.detect.outputs.mode == 
-      'auto' && needs.detect.outputs.changes == '[]')
+    if: needs.detect.outputs.mode == 'skip' || (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes == '[]')
 
     steps:
-      - run: echo "No relevant Docker context changes (or manual run without 
-          force); skipping."
+      - run: echo "No relevant Docker context changes (or manual run without force); skipping."
 
   # -- GPU stack: base-gpu -> executor-pool, ray-worker -> training-llm ----------
   build-gpu-stack:
     runs-on: ubuntu-latest
     needs: detect
-    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 
-      'auto' && needs.detect.outputs.changes != '[]')
+    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes != '[]')
 
     permissions:
       id-token: write
@@ -196,49 +192,34 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push base-gpu-torch (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.base_gpu == 'true') || 
-          contains(github.event.inputs.only_images, 'base-gpu-torch')
-        run: "chmod +x build_image.py\n./build_image.py --repo base-gpu-torch --dockerfile
-          images/base/gpu-torch/Dockerfile --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.base_gpu == 'true') || contains(github.event.inputs.only_images, 'base-gpu-torch')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo base-gpu-torch --dockerfile images/base/gpu-torch/Dockerfile --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push executor-gpu (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.executor_pool == 'true') || 
-          contains(github.event.inputs.only_images, 'executor-gpu')
-        run: "chmod +x build_image.py\n./build_image.py --repo executor-gpu --dockerfile
-          images/workload/executor-gpu/Dockerfile --context images/workload/executor-gpu
-          --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{
-          env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.executor_pool == 'true') || contains(github.event.inputs.only_images, 'executor-gpu')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo executor-gpu --dockerfile images/workload/executor-gpu/Dockerfile --context images/workload/executor-gpu --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push ray-gpu (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.ray_worker == 'true') || 
-          contains(github.event.inputs.only_images, 'ray-gpu')
-        run: "chmod +x build_image.py\n./build_image.py --repo ray-gpu --dockerfile
-          images/framework/ray-gpu/Dockerfile --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }} --build-args \"BASE_IMAGE=${{
-          env.ECR_REGISTRY }}/ml-platform/base-gpu:latest\""
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.ray_worker == 'true') || contains(github.event.inputs.only_images, 'ray-gpu')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo ray-gpu --dockerfile images/framework/ray-gpu/Dockerfile --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }} --build-args "BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/base-gpu-torch:latest"
       - name: Build and push training-llm (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.training_llm == 'true') || 
-          contains(github.event.inputs.only_images, 'training-llm')
-        run: "chmod +x build_image.py\n./build_image.py --repo training-llm --dockerfile
-          images/workload/training-llm/Dockerfile --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }} --build-args \"BASE_IMAGE=${{
-          env.ECR_REGISTRY }}/ml-platform/ray-worker:latest\" \"MLFLOW_VERSION=3.10.0\"\
-          \ \"OPENRLHF_VERSION=0.9.5\" \"VLLM_VERSION=0.17.0\""
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.training_llm == 'true') || contains(github.event.inputs.only_images, 'training-llm')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo training-llm --dockerfile images/workload/training-llm/Dockerfile --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }} --build-args "BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/ray-gpu:latest" "MLFLOW_VERSION=3.10.0" "OPENRLHF_VERSION=0.9.5" "VLLM_VERSION=0.17.0"
       - name: Build and push ml-gpu (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.ml_gpu
-          == 'true') || contains(github.event.inputs.only_images, 'ml-gpu')
-        run: "chmod +x build_image.py\n./build_image.py --repo ml-gpu --dockerfile
-          images/workload/ml-gpu/Dockerfile --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }} --build-args \"REGISTRY=${{
-          env.ECR_REGISTRY }}\" \"REPO=ml-platform\" \"BASE_TAG=latest\""
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.ml_gpu == 'true') || contains(github.event.inputs.only_images, 'ml-gpu')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo ml-gpu --dockerfile images/workload/ml-gpu/Dockerfile --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }} --build-args "REGISTRY=${{ env.ECR_REGISTRY }}" "REPO=ml-platform" "BASE_TAG=latest"
   build-cpu-stack:
     runs-on: ubuntu-latest
     needs: detect
-    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 
-      'auto' && needs.detect.outputs.changes != '[]')
+    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes != '[]')
 
     permissions:
       id-token: write
@@ -260,25 +241,19 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push base-cpu (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.base_cpu == 'true') || 
-          contains(github.event.inputs.only_images, 'base-cpu')
-        run: "chmod +x build_image.py\n./build_image.py --repo base-cpu --dockerfile
-          images/base/cpu/Dockerfile --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.base_cpu == 'true') || contains(github.event.inputs.only_images, 'base-cpu')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo base-cpu --dockerfile images/base/cpu/Dockerfile --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push executor-cpu (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.executor_pool_cpu == 'true') || 
-          contains(github.event.inputs.only_images, 'executor-cpu')
-        run: "chmod +x build_image.py\n./build_image.py --repo executor-cpu --dockerfile
-          images/workload/executor-cpu/Dockerfile --context images/workload/executor-cpu
-          --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{
-          env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.executor_pool_cpu == 'true') || contains(github.event.inputs.only_images, 'executor-cpu')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo executor-cpu --dockerfile images/workload/executor-cpu/Dockerfile --context images/workload/executor-cpu --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
   build-independent:
     runs-on: ubuntu-latest
     needs: detect
-    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 
-      'auto' && needs.detect.outputs.changes != '[]')
+    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 'auto' && needs.detect.outputs.changes != '[]')
 
     permissions:
       id-token: write
@@ -300,93 +275,62 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push notebook-cpu (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.notebook_cpu == 'true') || 
-          contains(github.event.inputs.only_images, 'notebook-cpu')
-        run: "chmod +x build_image.py\n./build_image.py --repo notebook-cpu --dockerfile
-          projects/jupyter/images/Dockerfile --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_cpu == 'true') || contains(github.event.inputs.only_images, 'notebook-cpu')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo notebook-cpu --dockerfile projects/jupyter/images/Dockerfile --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push notebook-marimo (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.notebook_marimo == 'true') || 
-          contains(github.event.inputs.only_images, 'notebook-marimo')
-        run: "chmod +x build_image.py\n./build_image.py --repo notebook-marimo --dockerfile
-          projects/jupyter/images/Dockerfile.marimo --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo == 'true') || contains(github.event.inputs.only_images, 'notebook-marimo')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo notebook-marimo --dockerfile projects/jupyter/images/Dockerfile.marimo --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push notebook-marimo-vscode (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.notebook_marimo_vscode == 'true') || 
-          contains(github.event.inputs.only_images, 'notebook-marimo-vscode')
-        run: "chmod +x build_image.py\n./build_image.py --repo notebook-marimo-vscode
-          --dockerfile projects/jupyter/images/Dockerfile.marimo.vscode --context
-          . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry
-          ${{ env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo_vscode == 'true') || contains(github.event.inputs.only_images, 'notebook-marimo-vscode')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo notebook-marimo-vscode --dockerfile projects/jupyter/images/Dockerfile.marimo.vscode --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push gpu-idle-monitor (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.gpu_idle_monitor == 'true') || 
-          contains(github.event.inputs.only_images, 'gpu-idle-monitor')
-        run: "chmod +x build_image.py\n./build_image.py --repo gpu-idle-monitor --dockerfile
-          projects/jupyter/gpu-idle-monitor/Dockerfile --context projects/jupyter/gpu-idle-monitor
-          --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{
-          env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.gpu_idle_monitor == 'true') || contains(github.event.inputs.only_images, 'gpu-idle-monitor')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo gpu-idle-monitor --dockerfile projects/jupyter/gpu-idle-monitor/Dockerfile --context projects/jupyter/gpu-idle-monitor --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push spark-base (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.spark_base == 'true') || 
-          contains(github.event.inputs.only_images, 'spark-base')
-        run: "chmod +x build_image.py\n./build_image.py --repo spark-base --dockerfile
-          projects/spark/images/Dockerfile --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.spark_base == 'true') || contains(github.event.inputs.only_images, 'spark-base')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo spark-base --dockerfile projects/spark/images/Dockerfile --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push text2sql-serve (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.text2sql_serve == 'true') || 
-          contains(github.event.inputs.only_images, 'text2sql-serve')
-        run: "chmod +x build_image.py\n./build_image.py --repo text2sql-serve --dockerfile
-          projects/workflows/text2sql/serve/Dockerfile --context projects/workflows/text2sql/serve
-          --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{
-          env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.text2sql_serve == 'true') || contains(github.event.inputs.only_images, 'text2sql-serve')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo text2sql-serve --dockerfile projects/workflows/text2sql/serve/Dockerfile --context projects/workflows/text2sql/serve --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push workflow-cpu (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.workflow_cpu == 'true') || 
-          contains(github.event.inputs.only_images, 'workflow-cpu')
-        run: "chmod +x build_image.py\n./build_image.py --repo workflow-cpu --dockerfile
-          projects/workflows/text2sql/images/Dockerfile.cpu --context projects/workflows/text2sql
-          --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{
-          env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.workflow_cpu == 'true') || contains(github.event.inputs.only_images, 'workflow-cpu')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo workflow-cpu --dockerfile projects/workflows/text2sql/images/Dockerfile.cpu --context projects/workflows/text2sql --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push workflow-gpu (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.workflow_gpu == 'true') || 
-          contains(github.event.inputs.only_images, 'workflow-gpu')
-        run: "chmod +x build_image.py\n./build_image.py --repo workflow-gpu --dockerfile
-          projects/workflows/text2sql/images/Dockerfile.gpu --context projects/workflows/text2sql
-          --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{
-          env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.workflow_gpu == 'true') || contains(github.event.inputs.only_images, 'workflow-gpu')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo workflow-gpu --dockerfile projects/workflows/text2sql/images/Dockerfile.gpu --context projects/workflows/text2sql --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push execution-service (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.execution_service == 'true') || 
-          contains(github.event.inputs.only_images, 'execution-service')
-        run: "chmod +x build_image.py\n./build_image.py --repo execution-service --dockerfile
-          projects/components/services/execution-service/Dockerfile --context projects/components/services/execution-service
-          --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{
-          env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.execution_service == 'true') || contains(github.event.inputs.only_images, 'execution-service')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo execution-service --dockerfile projects/components/services/execution-service/Dockerfile --context projects/components/services/execution-service --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push registry-service (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.registry_service == 'true') || 
-          contains(github.event.inputs.only_images, 'registry-service')
-        run: "chmod +x build_image.py\n./build_image.py --repo registry-service --dockerfile
-          projects/components/services/registry-service/Dockerfile --context projects/components/services/registry-service
-          --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{
-          env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.registry_service == 'true') || contains(github.event.inputs.only_images, 'registry-service')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo registry-service --dockerfile projects/components/services/registry-service/Dockerfile --context projects/components/services/registry-service --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push backend-api (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.backend == 'true') || 
-          contains(github.event.inputs.only_images, 'backend-api')
-        run: "chmod +x build_image.py\n./build_image.py --repo backend-api --dockerfile
-          projects/backend/Dockerfile --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.backend == 'true') || contains(github.event.inputs.only_images, 'backend-api')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo backend-api --dockerfile projects/backend/Dockerfile --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
       - name: Build and push dashboard (Smart SHA)
-        if: (needs.detect.outputs.mode == 'force' || 
-          needs.detect.outputs.dashboard == 'true') || 
-          contains(github.event.inputs.only_images, 'dashboard')
-        run: "chmod +x build_image.py\n./build_image.py --repo dashboard --dockerfile
-          projects/dashboard/Dockerfile --context . --branch ${{ github.event.inputs.source_branch
-          || 'main' }} --registry ${{ env.ECR_REGISTRY }}"
+        if: (needs.detect.outputs.mode == 'force' || needs.detect.outputs.dashboard == 'true') || contains(github.event.inputs.only_images, 'dashboard')
+        run: |-
+          chmod +x build_image.py
+          ./build_image.py --repo dashboard --dockerfile projects/dashboard/Dockerfile --context . --branch ${{ github.event.inputs.source_branch || 'main' }} --registry ${{ env.ECR_REGISTRY }}
