@@ -5,7 +5,9 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+// Always use the relative /api path — the Next.js rewrite in next.config.js
+// proxies these requests to the backend service at runtime.
+const API_BASE_URL = '/api';
 
 interface SSEOptions {
   /** PromQL query for the /chat/live endpoint */
