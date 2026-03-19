@@ -11,6 +11,7 @@ const API_BACKEND =
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  skipTrailingSlashRedirect: true,
   async rewrites() {
     return [
       {
