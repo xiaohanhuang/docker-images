@@ -1,0 +1,4 @@
+name: llm_finetune
+description: "Reusable LLM fine-tuning workflow component"
+image: ml-gpu
+tags: [llm, fine-tuning, workflow]

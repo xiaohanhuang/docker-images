@@ -1,0 +1,61 @@
+# ML-GPU Image for LLM-SFT Workflow
+# Purpose: Training, evaluation, registry (GPU tasks)
+# Aligned with projects/components/images/base-gpu (CUDA 12.9, torch 2.9.0)
+
+FROM nvidia/cuda:12.9.1-cudnn-runtime-ubuntu22.04
+
+WORKDIR /app
+
+# Install system dependencies (deadsnakes PPA required for Python 3.12)
+RUN apt-get update \
+    && apt-get install -y software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update \
+    && apt-get install -y \
+        python3.12 \
+        python3.12-venv \
+        python3.12-dev \
+        git \
+        curl \
+    && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlinks for python
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
+
+# Install PyTorch (matching base-gpu CUDA 12.9)
+RUN pip install --no-cache-dir \
+    torch==2.9.0 --index-url https://download.pytorch.org/whl/cu129
+
+# Install HuggingFace and training dependencies
+RUN pip install --no-cache-dir \
+    transformers==4.44.0 \
+    peft==0.12.0 \
+    accelerate==0.33.0 \
+    bitsandbytes==0.43.0 \
+    datasets==2.20.0 \
+    sentence-transformers==3.0.0
+
+# Install evaluation and MLflow dependencies
+RUN pip install --no-cache-dir \
+    rouge-score==0.1.2 \
+    mlflow==2.15.0 \
+    boto3==1.34.0
+
+# Install Flyte SDK
+RUN pip install --no-cache-dir \
+    flytekit==1.13.0
+
+# Copy shared component library (prepared by `make prepare`)
+COPY components/ /app/components/
+
+# Copy workflow code
+COPY config.py /app/config.py
+COPY tasks/ /app/tasks/
+COPY pipeline.py /app/pipeline.py
+
+# Set Python path
+ENV PYTHONPATH=/app:${PYTHONPATH}
+
+ENTRYPOINT ["python"]

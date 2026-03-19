@@ -1,0 +1,33 @@
+# NLB endpoint for Flyte gRPC.
+# The CLI only needs to talk to Flyte — Flyte orchestrates all other
+# services (Postgres, S3, etc.) internally within the cluster.
+#
+#   kubectl apply -f projects/eks/nlb-services.yaml
+#
+# After applying, update ~/.ml-plat/config.yaml with the NLB hostname
+# (it appears in `kubectl get svc -n flyte flyte-grpc-nlb` within ~60 s).
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flyte-grpc-nlb
+  namespace: flyte
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: "preserve_client_ip.enabled=false"
+    # Replace with your CIDR blocks (e.g., via kustomize/helm overlays).
+    # Find your IP: curl -s https://checkip.amazonaws.com, then use /24 subnet.
+    service.beta.kubernetes.io/aws-load-balancer-inbound-cidrs: "<YOUR_SUBNET>/24,<YOUR_SUBNET_2>/24"
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/component: flyte-binary
+    app.kubernetes.io/instance: flyte-binary
+    app.kubernetes.io/name: flyte-binary
+  ports:
+    - name: grpc
+      port: 8089
+      targetPort: 8089
+      protocol: TCP

@@ -1,0 +1,47 @@
+# GPU Warm Pool: keeps 1 GPU node always running via a low-priority placeholder pod.
+# When a real GPU workload arrives, the placeholder is preempted instantly (no cold start).
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: gpu-warm-pool
+value: -1
+globalDefault: false
+preemptionPolicy: Never
+description: "Low-priority class for GPU warm pool placeholder pods"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-warm-pool
+  namespace: default
+  labels:
+    app: gpu-warm-pool
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gpu-warm-pool
+  template:
+    metadata:
+      labels:
+        app: gpu-warm-pool
+    spec:
+      priorityClassName: gpu-warm-pool
+      terminationGracePeriodSeconds: 0
+      nodeSelector:
+        role: gpu-worker
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: "9"
+              memory: "16Mi"
+            limits:
+              cpu: "9"
+              memory: "16Mi"

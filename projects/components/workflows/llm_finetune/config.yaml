@@ -1,0 +1,4 @@
+project: ml_platform_demo
+domain: development
+version: v1
+image: ml-platform/training-llm:latest

@@ -5,12 +5,14 @@ import { usePathname } from 'next/navigation';
 import {
   Activity,
   BarChart3,
+  Bookmark,
   Box,
   Cpu,
   Database,
   GitBranch,
   Layers,
   LayoutDashboard,
+  MessageCircle,
 } from 'lucide-react';
 
 const navigation = [
@@ -21,6 +23,8 @@ const navigation = [
   { name: 'Infrastructure', href: '/infrastructure', icon: Cpu },
   { name: 'Kubernetes', href: '/kubernetes', icon: Layers },
   { name: 'Models', href: '/models', icon: Database },
+  { name: 'Ask AI', href: '/chat', icon: MessageCircle },
+  { name: 'Workspace', href: '/workspace', icon: Bookmark },
 ];
 
 export function Navigation() {

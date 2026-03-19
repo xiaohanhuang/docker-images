@@ -1,0 +1,46 @@
+# AWS Load Balancer Controller Helm values
+# Manages ALB/NLB lifecycle for Kubernetes Ingress/Service resources
+
+clusterName: ml-platform-eks
+
+# Service account with IRSA (IAM Roles for Service Accounts)
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+  annotations:
+    # This will be templated during Helm install via --set
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/alb-controller-role-ml-platform-eks
+
+# Resource requests/limits
+resources:
+  limits:
+    cpu: 200m
+    memory: 500Mi
+  requests:
+    cpu: 100m
+    memory: 200Mi
+
+# High availability
+replicaCount: 2
+
+# Security
+podSecurityContext:
+  fsGroup: 65534
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+
+# Logging
+logLevel: info
+
+# Enable Shield, WAF, and tags
+enableShield: false
+enableWaf: false
+enableWafv2: false
+
+# Default tags for all ALBs
+defaultTags:
+  managed-by: aws-load-balancer-controller
+  environment: production
+  platform: ml-platform

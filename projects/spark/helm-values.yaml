@@ -1,0 +1,27 @@
+# Spark-on-K8s Operator Helm Values
+# Chart: spark-operator from https://kubeflow.github.io/spark-operator
+# Version: 1.1.27
+
+sparkJobNamespace: ""  # Empty means all namespaces
+
+controller:
+  workers: 10
+
+webhook:
+  enable: true
+  # Scope webhook to spark-operator namespace only.
+  # Without this, ALL pod CREATE requests cluster-wide are intercepted,
+  # causing 30s hangs in other namespaces (e.g. JupyterHub spawn failures).
+  namespaceSelector: "kubernetes.io/metadata.name=spark-operator"
+  timeout: 5
+
+nodeSelector:
+  role: system
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi

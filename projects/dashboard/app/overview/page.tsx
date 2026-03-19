@@ -6,22 +6,21 @@ import { StatCard } from '@/components/StatCard';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { ErrorMessage } from '@/components/ErrorMessage';
 import { api } from '@/lib/api';
 import { formatDate, formatCurrency } from '@/lib/utils';
 
 export default function OverviewPage() {
-  const { data: pods, isLoading: podsLoading, error: podsError } = useQuery({
+  const { data: pods, isLoading: podsLoading } = useQuery({
     queryKey: ['pods'],
     queryFn: () => api.pods.list(),
   });
 
-  const { data: jobs, isLoading: jobsLoading, error: jobsError } = useQuery({
+  const { data: jobs, isLoading: jobsLoading } = useQuery({
     queryKey: ['jobs'],
     queryFn: () => api.jobs.list(10),
   });
 
-  const { data: costReport, isLoading: costLoading, error: costError } = useQuery({
+  const { data: costReport, isLoading: costLoading } = useQuery({
     queryKey: ['cost'],
     queryFn: () => api.cost.getReport(7),
   });
@@ -30,12 +29,13 @@ export default function OverviewPage() {
     return <LoadingSpinner />;
   }
 
-  if (podsError || jobsError || costError) {
-    return <ErrorMessage message="Failed to load overview data" />;
-  }
-
-  const activePods = pods?.filter((p: any) => p.status === 'Running') || [];
-  const gpuPods = activePods.filter((p: any) => p.gpu);
+  const activePods = pods?.filter((p) => p.status === 'Running') || [];
+  const gpuPods = activePods.filter((p) => {
+    const gpu = p.gpu;
+    if (typeof gpu === 'number') return gpu > 0;
+    if (typeof gpu === 'string') return gpu !== '0' && gpu !== '';
+    return false;
+  });
   const recentJobs = jobs || [];
   const totalCost = costReport?.total_cost || 0;
 
@@ -76,7 +76,7 @@ export default function OverviewPage() {
               <p className="text-gray-500 text-sm">No active GPU pods</p>
             ) : (
               <div className="space-y-3">
-                {gpuPods.slice(0, 5).map((pod: any) => (
+                {gpuPods.slice(0, 5).map((pod) => (
                   <div key={pod.name} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{pod.name}</p>
@@ -102,7 +102,7 @@ export default function OverviewPage() {
               <p className="text-gray-500 text-sm">No recent executions</p>
             ) : (
               <div className="space-y-3">
-                {recentJobs.slice(0, 5).map((job: any) => (
+                {recentJobs.slice(0, 5).map((job) => (
                   <div key={job.job_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{job.workflow}</p>

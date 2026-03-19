@@ -1,0 +1,33 @@
+# kube-prometheus-stack Helm Values
+# Chart: kube-prometheus-stack from https://prometheus-community.github.io/helm-charts
+# Version: 56.0.0
+
+grafana:
+  enabled: true
+  adminPassword: "admin"  # Change for production!
+  sidecar:
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+
+prometheus:
+  prometheusSpec:
+    # Allow scraping from any namespace
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+
+    # Storage for metrics retention
+    retention: 30d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 50Gi
+
+# DCGM Exporter for GPU metrics
+additionalPrometheusRulesMap: {}
+
+nodeExporter:
+  enabled: true

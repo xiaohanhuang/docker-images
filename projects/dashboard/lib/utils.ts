@@ -1,32 +1,31 @@
-export function formatDate(dateString: string | null | undefined): string {
-  if (!dateString) return '—';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return '—';
-  return date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+import { formatDistanceToNow } from 'date-fns';
+
+export function formatDate(date: string | Date): string {
+  return formatDistanceToNow(new Date(date), { addSuffix: true });
 }
 
-export function formatCurrency(amount: number | null | undefined): string {
-  if (amount == null) return '$0.00';
+export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 2,
   }).format(amount);
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  running: 'bg-green-100 text-green-800',
-  succeeded: 'bg-blue-100 text-blue-800',
-  failed: 'bg-red-100 text-red-800',
-  pending: 'bg-yellow-100 text-yellow-800',
-  unknown: 'bg-gray-100 text-gray-800',
-};
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+}
 
 export function getStatusColor(status: string): string {
-  return STATUS_COLORS[status.toLowerCase()] ?? STATUS_COLORS.unknown;
+  const statusColors: Record<string, string> = {
+    Running: 'bg-green-100 text-green-800',
+    Succeeded: 'bg-blue-100 text-blue-800',
+    Failed: 'bg-red-100 text-red-800',
+    Pending: 'bg-yellow-100 text-yellow-800',
+    Unknown: 'bg-gray-100 text-gray-800',
+  };
+  return statusColors[status] || statusColors.Unknown;
 }

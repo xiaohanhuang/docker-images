@@ -1,0 +1,4 @@
+name: llm-sft
+description: "LLM Supervised Fine-Tuning pipeline: ingest → tokenize → LoRA fine-tune → evaluate → publish"
+image: ml-gpu
+tags: [llm, sft, fine-tuning, lora]

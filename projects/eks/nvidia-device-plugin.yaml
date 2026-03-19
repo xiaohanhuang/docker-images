@@ -1,0 +1,200 @@
+# ============================================================
+# NVIDIA Device Plugin — Dual DaemonSet Setup
+# ============================================================
+#
+# Two DaemonSets with different configs, selected by node labels:
+#
+#   1. nvidia-device-plugin-training  (nodeSelector: role=gpu-worker)
+#      → Full dedicated GPUs.  Uses a node-affinity expression to
+#        skip nodes where nvidia.com/device-plugin.config is set
+#        (any value), so it only runs on training nodepools.
+#
+#   2. nvidia-device-plugin-shared    (nodeSelector: nvidia.com/device-plugin.config=time-slicing)
+#      → 4× time-sliced replicas per GPU for shared/dev workloads.
+#
+# Both use deviceListStrategy=envvar so EKS containerd sets
+# NVIDIA_VISIBLE_DEVICES correctly.
+#
+# Requires:
+#   1. GPU nodes running the EKS nvidia AMI
+#   2. nvidia-modprobe run at boot to create /dev/nvidia* device nodes
+#   3. Host /usr/lib64 mounted for NVML library access
+# ============================================================
+
+# -- ConfigMap: full GPUs (training) ------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-dp-config-training
+  namespace: kube-system
+data:
+  config.yaml: |
+    version: v1
+    flags:
+      deviceListStrategy: envvar
+---
+# -- ConfigMap: time-slicing (shared) -----------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-dp-config-time-slicing
+  namespace: kube-system
+data:
+  config.yaml: |
+    version: v1
+    flags:
+      deviceListStrategy: envvar
+    sharing:
+      timeSlicing:
+        resources:
+          - name: nvidia.com/gpu
+            replicas: 4
+---
+# -- DaemonSet: training (full GPUs) ------------------------------------------
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-training
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-dp-training
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-dp-training
+    spec:
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      nodeSelector:
+        role: gpu-worker
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: nvidia.com/device-plugin.config
+                operator: DoesNotExist
+      priorityClassName: "system-node-critical"
+      containers:
+      - image: nvcr.io/nvidia/k8s-device-plugin:v0.17.0
+        name: nvidia-device-plugin-ctr
+        args:
+          - --config-file=/config/config.yaml
+        env:
+          - name: FAIL_ON_INIT_ERROR
+            value: "false"
+          - name: NVIDIA_DRIVER_ROOT
+            value: "/"
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: "void"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: device-plugin
+          mountPath: /var/lib/kubelet/device-plugins
+        - name: config
+          mountPath: /config
+        - name: cdi
+          mountPath: /etc/cdi
+        - name: nvidia-run
+          mountPath: /run/nvidia
+        - name: nvidia-dev
+          mountPath: /dev
+        - name: nvidia-libs
+          mountPath: /usr/lib64
+      volumes:
+      - name: device-plugin
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+      - name: config
+        configMap:
+          name: nvidia-dp-config-training
+      - name: cdi
+        hostPath:
+          path: /etc/cdi
+      - name: nvidia-run
+        hostPath:
+          path: /run/nvidia
+      - name: nvidia-dev
+        hostPath:
+          path: /dev
+      - name: nvidia-libs
+        hostPath:
+          path: /usr/lib64
+---
+# -- DaemonSet: shared (time-sliced GPUs) -------------------------------------
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-shared
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-dp-shared
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-dp-shared
+    spec:
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      nodeSelector:
+        nvidia.com/device-plugin.config: time-slicing
+      priorityClassName: "system-node-critical"
+      containers:
+      - image: nvcr.io/nvidia/k8s-device-plugin:v0.17.0
+        name: nvidia-device-plugin-ctr
+        args:
+          - --config-file=/config/config.yaml
+        env:
+          - name: FAIL_ON_INIT_ERROR
+            value: "false"
+          - name: NVIDIA_DRIVER_ROOT
+            value: "/"
+          - name: NVIDIA_VISIBLE_DEVICES
+            value: "void"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: device-plugin
+          mountPath: /var/lib/kubelet/device-plugins
+        - name: config
+          mountPath: /config
+        - name: cdi
+          mountPath: /etc/cdi
+        - name: nvidia-run
+          mountPath: /run/nvidia
+        - name: nvidia-dev
+          mountPath: /dev
+        - name: nvidia-libs
+          mountPath: /usr/lib64
+      volumes:
+      - name: device-plugin
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+      - name: config
+        configMap:
+          name: nvidia-dp-config-time-slicing
+      - name: cdi
+        hostPath:
+          path: /etc/cdi
+      - name: nvidia-run
+        hostPath:
+          path: /run/nvidia
+      - name: nvidia-dev
+        hostPath:
+          path: /dev
+      - name: nvidia-libs
+        hostPath:
+          path: /usr/lib64

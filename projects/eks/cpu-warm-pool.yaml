@@ -1,0 +1,39 @@
+# Warm-pool placeholder: keeps 1 CPU node always ready so notebook starts are instant.
+# Uses a very low PriorityClass so real workloads preempt it immediately.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: warm-pool-placeholder
+value: -1
+globalDefault: false
+description: "Low-priority placeholder to keep Karpenter CPU nodes warm"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-warm-pool
+  namespace: jupyter
+  labels:
+    app: cpu-warm-pool
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpu-warm-pool
+  template:
+    metadata:
+      labels:
+        app: cpu-warm-pool
+    spec:
+      priorityClassName: warm-pool-placeholder
+      terminationGracePeriodSeconds: 0
+      nodeSelector:
+        role: cpu-worker
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: "2"
+              memory: "4Gi"
