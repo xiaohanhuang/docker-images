@@ -1,0 +1,189 @@
+{
+  "title": "GPU Cost Allocation",
+  "uid": "kubecost-gpu-allocation",
+  "tags": [
+    "finops",
+    "gpu",
+    "kubecost"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 36,
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "GPU Cost by Namespace ($/hr)",
+      "type": "bargauge",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": "Prometheus",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "currencyUSD",
+          "decimals": 4
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(container_gpu_allocation * on(node) group_left(instance_type) node_gpu_hourly_cost) by (namespace)",
+          "legendFormat": "{{namespace}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "GPU Allocation by Namespace (# GPUs)",
+      "type": "bargauge",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": "Prometheus",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "decimals": 2
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(container_gpu_allocation) by (namespace)",
+          "legendFormat": "{{namespace}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Total Cluster Cost by Namespace ($/hr)",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "currencyUSD",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(container_cpu_allocation * on(node) group_left() node_cpu_hourly_cost + container_memory_allocation_bytes / 1073741824 * on(node) group_left() node_ram_hourly_cost) by (namespace)",
+          "legendFormat": "{{namespace}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Node Hourly Cost",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 12,
+        "h": 5
+      },
+      "datasource": "Prometheus",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 4
+        }
+      },
+      "targets": [
+        {
+          "expr": "node_total_hourly_cost",
+          "legendFormat": "{{node}} ({{instance_type}})",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "GPU Allocation Over Time",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 17,
+        "w": 12,
+        "h": 5
+      },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(container_gpu_allocation > 0) by (namespace, pod)",
+          "legendFormat": "{{namespace}}/{{pod}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

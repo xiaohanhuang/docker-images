@@ -1,0 +1,111 @@
+# Shared EFS storage — one static PV per namespace, all pointing to the
+# same EFS filesystem root so every pod sees the same /workspace content.
+#
+# Each namespace needs its own PV+PVC pair because a static PV can only
+# bind to one PVC. All PVs use the same volumeHandle (filesystem ID,
+# no access-point suffix) so they share the same root directory.
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: efs-shared-default
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    name: efs-claim
+    namespace: default
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: fs-023c01becc3409078:/shared
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-claim
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: efs-shared-default
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: efs-shared-jupyter
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    name: efs-claim
+    namespace: jupyter
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: fs-023c01becc3409078:/shared
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-claim
+  namespace: jupyter
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: efs-shared-jupyter
+  resources:
+    requests:
+      storage: 100Gi
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: efs-shared-flytesnacks
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    name: efs-claim
+    namespace: flytesnacks-development
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: fs-023c01becc3409078:/shared
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: efs-claim
+  namespace: flytesnacks-development
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: efs-shared-flytesnacks
+  resources:
+    requests:
+      storage: 100Gi

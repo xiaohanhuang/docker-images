@@ -1,0 +1,6 @@
+name: ingest
+version: "1.0.0"
+description: "Download datasets from S3"
+category: data
+image: data-cpu
+tags: [data, ingestion, s3]

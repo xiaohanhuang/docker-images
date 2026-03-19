@@ -1,0 +1,58 @@
+# MLflow Helm Values
+# Chart: mlflow from https://community-charts.github.io/helm-charts
+# Version: 1.8.1 (app version 3.7.0)
+
+backendStore:
+  # PostgreSQL backend on the shared in-cluster StatefulSet (postgres.postgres.svc.cluster.local).
+  # MLflow runs schema migrations automatically on startup when databaseMigration: true.
+  databaseMigration: true
+  postgres:
+    enabled: true
+    host: "postgres.postgres.svc.cluster.local"
+    port: 5432
+    database: "mlflow"
+    user: "mlflow"
+    # Password is injected from mlflow-db-credentials Secret at deploy time via --set
+    password: ""
+
+artifactRoot:
+  s3:
+    enabled: true
+    bucket: "ml-platform-mlflow-artifacts"
+
+serviceMonitor:
+  enabled: true   # Expose metrics to Prometheus
+
+# Disable chart's auto-generated --gunicorn-opts (incompatible with MLflow 3.7
+# security middleware flags). We use --uvicorn-opts below instead.
+log:
+  enabled: false
+
+extraArgs:
+  # MLflow 3.7 uses uvicorn by default; pass log level via --uvicorn-opts.
+  uvicornOpts: "--log-level info"
+  # Comma-separated allowed Host headers for DNS-rebinding protection.
+  # Includes: ALB (external), K8s service DNS (internal pods), private IPs.
+  allowedHosts: "k8s-monitori-mlflow-0985830759-1985412867.us-west-2.elb.amazonaws.com,localhost,localhost:*,127.0.0.1,127.0.0.1:*,mlflow.monitoring.svc.cluster.local,mlflow.monitoring.svc.cluster.local:*,10.*"
+
+extraEnvVars:
+  MLFLOW_SERVER_ALLOWED_HOSTS: "k8s-monitori-mlflow-0985830759-1985412867.us-west-2.elb.amazonaws.com,localhost,localhost:*,127.0.0.1,127.0.0.1:*,mlflow.monitoring.svc.cluster.local,mlflow.monitoring.svc.cluster.local:*,10.*"
+
+nodeSelector:
+  role: system
+
+ingress:
+  enabled: true
+  className: alb
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"

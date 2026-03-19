@@ -1,0 +1,6 @@
+name: vllm_deploy
+version: "1.0.0"
+description: "Deploy a model as a vLLM inference server"
+category: serving
+image: genai-gpu
+tags: [serving, vllm, deployment]

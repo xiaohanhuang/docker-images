@@ -1,0 +1,42 @@
+# KEDA (Kubernetes Event-driven Autoscaling) Helm Values
+# Chart: keda from https://kedacore.github.io/charts
+# Version: 2.16.1
+
+# Operator placement — run on system nodes (applies to all KEDA pods)
+nodeSelector:
+  role: system
+
+# Resource limits for KEDA operator
+resources:
+  operator:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  metricServer:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  webhooks:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# Enable Prometheus metrics for KEDA operator observability
+prometheus:
+  operator:
+    enabled: true
+    port: 8080
+  metricServer:
+    enabled: true
+    port: 8080
+  webhooks:
+    enabled: false

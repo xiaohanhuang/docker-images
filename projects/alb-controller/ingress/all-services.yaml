@@ -1,0 +1,249 @@
+---
+# Ingress for Flyte Console (HTTP UI)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flyte-console
+  namespace: flyte
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /healthcheck
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: flyte-binary-http
+                port:
+                  number: 8088
+
+---
+# NOTE: Flyte gRPC ingress removed. ALB only supports HTTP/HTTPS backend protocols,
+# not GRPC. gRPC requires HTTP/2 which ALB doesn't support without TLS.
+# FlyteAdmin gRPC is accessible via:
+#   - Port-forward: kubectl port-forward -n flyte svc/flyte-binary-grpc 8089:8089
+#   - In-cluster: flyte-binary-grpc.flyte.svc.cluster.local:8089
+
+---
+# Ingress for Grafana
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: monitoring
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80
+
+---
+# Ingress for MLflow
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mlflow
+  namespace: monitoring
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mlflow
+                port:
+                  number: 5000
+
+---
+# Ingress for JupyterHub
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jupyterhub
+  namespace: jupyter
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /hub/health
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: proxy-public
+                port:
+                  number: 80
+
+---
+# Ingress for Prometheus
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus
+  namespace: monitoring
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /-/healthy
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-prometheus
+                port:
+                  number: 9090
+
+---
+# Ingress for Kubecost
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubecost
+  namespace: kubecost
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kubecost-cost-analyzer
+                port:
+                  number: 9090
+
+---
+# Ingress for Remote Agent
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ml-plat-agent
+  namespace: default
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ml-plat-agent
+                port:
+                  number: 8080
+
+---
+# Ingress for ML Platform Dashboard
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ml-platform-dashboard
+  namespace: ml-platform
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ml-platform-dashboard
+                port:
+                  number: 80
+
+---
+# Ingress for ML Platform Backend API
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ml-platform-api
+  namespace: ml-platform-development
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ml-platform-api
+                port:
+                  number: 8000

@@ -57,9 +57,8 @@ async def list_runs(experiment_id: str) -> dict[str, Any]:
             response.raise_for_status()
             return response.json()
     except Exception as e:
-        logger.error(f"Failed to list runs for experiment {experiment_id}: {e}")
-        logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.warning(f"Failed to list runs for experiment {experiment_id}: {e}")
+        return {"runs": []}
 
 
 @router.get("/models")
@@ -105,6 +104,8 @@ async def get_model(model_name: str) -> dict[str, Any]:
             response.raise_for_status()
             return response.json()
     except Exception as e:
-        logger.error(f"Failed to get model {model_name}: {e}")
-        logger.exception("Internal error")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.warning(f"Failed to get model {model_name}: {e}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Model '{model_name}' not found or MLflow unavailable",
+        )

@@ -1,0 +1,4 @@
+name: text2sql
+description: "Text-to-SQL pipeline: ingest → preprocess → train → evaluate → serve"
+image: ml-gpu
+tags: [text2sql, nlp, code-generation, fine-tuning]

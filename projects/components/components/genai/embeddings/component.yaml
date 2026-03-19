@@ -1,0 +1,6 @@
+name: embeddings
+version: "1.0.0"
+description: "Batch-generate text embeddings with sentence-transformers"
+category: genai
+image: genai-gpu
+tags: [genai, embeddings, sentence-transformers]

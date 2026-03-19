@@ -1,0 +1,6 @@
+name: preprocess
+version: "1.0.0"
+description: "Normalize and split tabular datasets"
+category: data
+image: data-cpu
+tags: [data, preprocessing]

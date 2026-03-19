@@ -35,7 +35,7 @@ DEFAULT_EVAL_STEPS = 200
 # ── MLflow ────────────────────────────────────────────────────────────
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://mlflow.monitoring.svc.cluster.local:5000",
+    "http://mlflow.monitoring.svc.cluster.local",
 )
 MLFLOW_EXPERIMENT = "text2sql"
 MLFLOW_MODEL_NAME = "text2sql"

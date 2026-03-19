@@ -40,9 +40,7 @@ try:
 
     _efs_volume = V1Volume(
         name="efs-storage",
-        persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(
-            claim_name="efs-claim"
-        ),
+        persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(claim_name="efs-claim"),
     )
     _efs_mount = V1VolumeMount(name="efs-storage", mount_path="/workspace")
 
@@ -67,6 +65,8 @@ except ImportError:
 
 
 @task(
+    cache=True,  # cache for dev speedup
+    cache_version="2",
     requests=Resources(cpu="4", mem="14Gi", gpu="1"),
     limits=Resources(cpu="4", mem="14Gi", gpu="1"),
     container_image=GPU_IMAGE,
@@ -113,9 +113,7 @@ def train(
     def load_split(name):
         tmpdir = tempfile.mkdtemp()
         paginator = s3.get_paginator("list_objects_v2")
-        pages = paginator.paginate(
-            Bucket=S3_BUCKET, Prefix=f"text2sql/processed/{name}/"
-        )
+        pages = paginator.paginate(Bucket=S3_BUCKET, Prefix=f"text2sql/processed/{name}/")
         for page in pages:
             for obj in page.get("Contents", []):
                 key = obj["Key"]
@@ -149,7 +147,7 @@ def train(
         per_device_eval_batch_size=batch_size,
         learning_rate=learning_rate,
         warmup_steps=DEFAULT_WARMUP_STEPS,
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         eval_steps=DEFAULT_EVAL_STEPS,
         save_strategy="steps",
         save_steps=DEFAULT_EVAL_STEPS,
@@ -167,25 +165,34 @@ def train(
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=val_ds,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         data_collator=data_collator,
     )
 
-    # ── Resume-aware checkpoint: find the latest checkpoint on EFS ────
+    # ── Resume-aware checkpoint: find the latest valid checkpoint on EFS ─
+    # Spot preemptions can leave incomplete checkpoints (missing
+    # trainer_state.json, etc.).  Walk from newest to oldest and pick the
+    # first checkpoint that has the required files.
     resume_ckpt = None
     if os.path.isdir(checkpoint_dir):
-        ckpt_dirs = [
-            d
-            for d in os.listdir(checkpoint_dir)
-            if d.startswith("checkpoint-")
-            and os.path.isdir(os.path.join(checkpoint_dir, d))
-        ]
-        if ckpt_dirs:
-            resume_ckpt = os.path.join(
-                checkpoint_dir,
-                sorted(ckpt_dirs, key=lambda x: int(x.split("-")[-1]))[-1],
-            )
-            print(f"Resuming from checkpoint: {resume_ckpt}")
+        ckpt_dirs = sorted(
+            [
+                d
+                for d in os.listdir(checkpoint_dir)
+                if d.startswith("checkpoint-") and os.path.isdir(os.path.join(checkpoint_dir, d))
+            ],
+            key=lambda x: int(x.split("-")[-1]),
+            reverse=True,
+        )
+        for d in ckpt_dirs:
+            candidate = os.path.join(checkpoint_dir, d)
+            required = os.path.join(candidate, "trainer_state.json")
+            if os.path.isfile(required):
+                resume_ckpt = candidate
+                print(f"Resuming from checkpoint: {resume_ckpt}")
+                break
+            else:
+                print(f"Skipping incomplete checkpoint: {candidate}")
 
     with mlflow.start_run():
         mlflow.log_params(
@@ -221,6 +228,17 @@ def train(
         print(f"✅ Checkpoint uploaded to s3://{S3_BUCKET}/{ckpt_s3_prefix}")
         mlflow.log_param("checkpoint_s3_path", f"s3://{S3_BUCKET}/{ckpt_s3_prefix}")
         mlflow.set_tag("run_id", run_id)
+
+        # Log to MLflow so that register_model can find it
+        components = {
+            "model": trainer.model,
+            "tokenizer": tokenizer,
+        }
+        mlflow.transformers.log_model(
+            transformers_model=components,
+            artifact_path="model",
+            task="text2text-generation",
+        )
 
     checkpoint_path = f"s3://{S3_BUCKET}/{ckpt_s3_prefix}"
     print(f"✅ Training complete. Best checkpoint: {checkpoint_path}")

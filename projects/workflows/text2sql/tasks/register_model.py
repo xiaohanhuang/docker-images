@@ -43,10 +43,23 @@ def register_model(eval_metrics: dict) -> str:
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     client = MlflowClient()
 
+    # ── Get checkpoint path from training run ─────────────────────────
+    run = client.get_run(run_id)
+    checkpoint_path = run.data.params.get("checkpoint_s3_path", "")
+
     # ── Register model ────────────────────────────────────────────────
-    registered = mlflow.register_model(
-        model_uri=f"runs:/{run_id}/model",
+    # Use create_model_version with the S3 checkpoint as source,
+    # because mlflow.transformers.log_model() in train may not have
+    # persisted artifacts to the MLflow artifact store.
+    try:
+        client.create_registered_model(MLFLOW_MODEL_NAME)
+    except mlflow.exceptions.MlflowException:
+        pass  # model already exists
+
+    registered = client.create_model_version(
         name=MLFLOW_MODEL_NAME,
+        source=checkpoint_path,
+        run_id=run_id,
     )
     version = registered.version
     print(f"✅ Registered model '{MLFLOW_MODEL_NAME}' version {version}")

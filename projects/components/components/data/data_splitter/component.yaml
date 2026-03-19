@@ -1,0 +1,6 @@
+name: data_splitter
+version: "1.0.0"
+description: "Split tokenized data into train/val/test sets"
+category: data
+image: data-cpu
+tags: [data, splitting]

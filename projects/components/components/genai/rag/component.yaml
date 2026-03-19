@@ -1,0 +1,6 @@
+name: rag
+version: "1.0.0"
+description: "Retrieval-Augmented Generation pipeline"
+category: genai
+image: genai-gpu
+tags: [genai, rag, retrieval]

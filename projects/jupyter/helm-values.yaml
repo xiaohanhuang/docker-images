@@ -1,0 +1,338 @@
+# JupyterHub Helm Values (Zero-to-JupyterHub)
+# Chart: jupyterhub from https://hub.jupyter.org/helm-chart/
+# Version: 3.2.1
+
+hub:
+  nodeSelector:
+    role: system
+  config:
+    Authenticator:
+      allowed_users:
+        - xiaohan
+      admin_users:
+        - xiaohan
+    JupyterHub:
+      # WARNING: DummyAuthenticator is intended for local development/testing only.
+      # Configure a secure OAuth (or other production-ready) authenticator for real deployments.
+      authenticator_class: dummy
+  extraEnv:
+    DUMMY_AUTH_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: jupyterhub-auth-secret
+          key: password
+  extraConfig:
+    dummy-auth-password: |
+      import os
+      password = os.environ.get('DUMMY_AUTH_PASSWORD')
+      if not password:
+          raise RuntimeError("DUMMY_AUTH_PASSWORD environment variable must be set for DummyAuthenticator.")
+      c.DummyAuthenticator.password = password
+
+debug:
+  enabled: false
+
+# Built-in pre-puller disabled — it pulls ALL images on ALL nodes and cannot
+# target different images to CPU vs GPU nodes.  Custom DaemonSets in
+# image-prepuller.yaml handle node-targeted pre-pulling instead.
+prePuller:
+  hook:
+    enabled: false
+  continuous:
+    enabled: false
+
+singleuser:
+  serviceAccountName: singleuser
+  startTimeout: 600
+  uid: 0  # start as root so start.sh can rename jovyan → NB_USER, then drops privileges
+  extraEnv:
+    NB_USER: xiaohan
+    CHOWN_HOME: "yes"
+    # Fix iframe routing for proxy tools
+    JUPYTER_SERVER_PROXY_URL: "127.0.0.1:8888"
+  # Default notebook server image (no GPU)
+  image:
+    name: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo-vscode
+    tag: e718bb3bea005ea88e23813e44e495ad175681af
+    pullPolicy: IfNotPresent
+  defaultUrl: /lab
+
+  # Fix: copy marimo_proxy module into site-packages so the entry point works.
+  # Needed until the image is rebuilt with the correct package layout (7c8cdd2+).
+  initContainers:
+    - name: fix-marimo-proxy
+      image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo:12464b930fc0ff3ba16fb00f67ca83689cf203f2
+      command:
+        - /bin/sh
+        - -c
+        - cp /opt/marimo-proxy/__init__.py /marimo-module/__init__.py
+      volumeMounts:
+        - name: marimo-proxy-module
+          mountPath: /marimo-module
+
+  # Mount the shared EFS volume and idle-monitor token dir into every notebook server
+  storage:
+    extraVolumes:
+      - name: efs-storage
+        persistentVolumeClaim:
+          claimName: efs-claim
+      - name: idle-monitor-token
+        emptyDir: {}
+      - name: marimo-proxy-module
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: efs-storage
+        mountPath: /shared
+      - name: idle-monitor-token
+        mountPath: /var/idle-monitor
+      - name: marimo-proxy-module
+        mountPath: /opt/conda/lib/python3.12/site-packages/marimo_proxy
+    type: dynamic
+    capacity: 50Gi
+    dynamic:
+      storageClass: gp3
+
+  # Profile list allows users to choose their environment
+  profileList:
+    - display_name: "CPU - Standard (4 CPU, 8GB)"
+      description: "For data exploration, quick experiments"
+      default: true
+      kubespawner_override:
+        cpu_limit: 4
+        cpu_guarantee: 2
+        mem_limit: "8G"
+        mem_guarantee: "4G"
+        node_selector:
+          role: cpu-worker
+
+    - display_name: "GPU - Shared A10G (1/4 GPU, shared VRAM, 4GB RAM)"
+      description: "1/4 NVIDIA A10G via time-slicing - Shared for prototyping. Note: VRAM is NOT hardware-isolated (time-slicing shares the full 24GB GPU). Best for light workloads."
+      kubespawner_override:
+        image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo-vscode:e718bb3bea005ea88e23813e44e495ad175681af
+        image_pull_policy: IfNotPresent
+        cpu_limit: 1
+        cpu_guarantee: 0.5
+        mem_limit: "4G"
+        mem_guarantee: "2G"
+        extra_resource_limits:
+          nvidia.com/gpu: "1"
+        node_selector:
+          nvidia.com/device-plugin.config: "time-slicing"
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+        lifecycle_hooks:
+          postStart:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "echo $JUPYTERHUB_API_TOKEN > /var/idle-monitor/token"
+        extra_containers:
+          - name: idle-monitor
+            image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/gpu-idle-monitor:12464b930fc0ff3ba16fb00f67ca83689cf203f2
+            imagePullPolicy: Always
+            env:
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: IDLE_THRESHOLD_SECONDS
+                value: "1800"
+              - name: CHECK_INTERVAL_SECONDS
+                value: "60"
+            volumeMounts:
+              - name: idle-monitor-token
+                mountPath: /var/idle-monitor
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "100m"
+                memory: "128Mi"
+
+    - display_name: "GPU - Single A10G (4 CPU, 24GB VRAM, 16GB RAM)"
+      description: "1x NVIDIA A10G (g5.xlarge) - Cost Effective"
+      kubespawner_override:
+        image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo-vscode:e718bb3bea005ea88e23813e44e495ad175681af
+        image_pull_policy: IfNotPresent
+        cpu_limit: 4
+        cpu_guarantee: 2
+        mem_limit: "14G"
+        mem_guarantee: "8G"
+        extra_resource_limits:
+          nvidia.com/gpu: "1"
+        node_selector:
+          role: gpu-worker
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule
+        lifecycle_hooks:
+          postStart:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "echo $JUPYTERHUB_API_TOKEN > /var/idle-monitor/token"
+        extra_containers:
+          - name: idle-monitor
+            image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/gpu-idle-monitor:12464b930fc0ff3ba16fb00f67ca83689cf203f2
+            imagePullPolicy: Always
+            env:
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: IDLE_THRESHOLD_SECONDS
+                value: "1800"
+              - name: CHECK_INTERVAL_SECONDS
+                value: "60"
+            volumeMounts:
+              - name: idle-monitor-token
+                mountPath: /var/idle-monitor
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "100m"
+                memory: "128Mi"
+
+    - display_name: "GPU - Single A10G High-Mem (32 CPU, 24GB VRAM, 128GB RAM)"
+      description: "1x NVIDIA A10G (g5.8xlarge) - For heavy data loading"
+      kubespawner_override:
+        image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-custom:12464b930fc0ff3ba16fb00f67ca83689cf203f2
+        image_pull_policy: Always
+        cmd: ["/opt/venv/bin/jupyterhub-singleuser"]
+        cpu_limit: 32
+        cpu_guarantee: 16
+        mem_limit: "128G"
+        mem_guarantee: "64G"
+        extra_resource_limits:
+          nvidia.com/gpu: "1"
+        node_selector:
+          node.kubernetes.io/instance-type: "g5.8xlarge"
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+        lifecycle_hooks:
+          postStart:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "echo $JUPYTERHUB_API_TOKEN > /var/idle-monitor/token"
+        extra_containers:
+          - name: idle-monitor
+            image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/gpu-idle-monitor:12464b930fc0ff3ba16fb00f67ca83689cf203f2
+            imagePullPolicy: Always
+            env:
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: IDLE_THRESHOLD_SECONDS
+                value: "1800"
+              - name: CHECK_INTERVAL_SECONDS
+                value: "60"
+            volumeMounts:
+              - name: idle-monitor-token
+                mountPath: /var/idle-monitor
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "100m"
+                memory: "128Mi"
+
+    - display_name: "GPU - 4x NVIDIA A10G (48 CPU, 96GB VRAM, 192GB RAM)"
+      description: "4x NVIDIA A10G (g5.12xlarge) - For Distributed Training"
+      kubespawner_override:
+        image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-custom:12464b930fc0ff3ba16fb00f67ca83689cf203f2
+        image_pull_policy: Always
+        cmd: ["/opt/venv/bin/jupyterhub-singleuser"]
+        cpu_limit: 48
+        cpu_guarantee: 24
+        mem_limit: "192G"
+        mem_guarantee: "96G"
+        extra_resource_limits:
+          nvidia.com/gpu: "4"
+        node_selector:
+          node.kubernetes.io/instance-type: "g5.12xlarge"
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Equal
+            value: "true"
+            effect: NoSchedule
+        lifecycle_hooks:
+          postStart:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "echo $JUPYTERHUB_API_TOKEN > /var/idle-monitor/token"
+        extra_containers:
+          - name: idle-monitor
+            image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/gpu-idle-monitor:12464b930fc0ff3ba16fb00f67ca83689cf203f2
+            imagePullPolicy: Always
+            env:
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: IDLE_THRESHOLD_SECONDS
+                value: "1800"
+              - name: CHECK_INTERVAL_SECONDS
+                value: "60"
+            volumeMounts:
+              - name: idle-monitor-token
+                mountPath: /var/idle-monitor
+            resources:
+              requests:
+                cpu: "50m"
+                memory: "64Mi"
+              limits:
+                cpu: "100m"
+                memory: "128Mi"
+
+  # Pre-install the platform SDK in all notebook servers
+  # lifecycleHooks:
+  #   postStart:
+  #     exec:
+  #       command:
+  #         - sh
+  #         - -c
+  #         - "pip install -q ml-platform-sdk flytekit mlflow vllm && echo 'VLLM Installed'"
+
+proxy:
+  service:
+    type: LoadBalancer
+  chp:
+    nodeSelector:
+      role: system
+
+scheduling:
+  userScheduler:
+    enabled: false

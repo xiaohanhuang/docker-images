@@ -22,7 +22,7 @@ from config import (
 
 
 @task(
-    requests=Resources(cpu="4", mem="8Gi"),
+    requests=Resources(cpu="2", mem="4Gi"),
     container_image=CPU_IMAGE,
     cache=True,
     cache_version="preprocess-v1.0",
@@ -74,9 +74,7 @@ def preprocess(raw_s3_path: str) -> str:
 
     # ── Format prompts ────────────────────────────────────────────────
     def make_prompt(row):
-        return (
-            f"translate English to SQL: {row['question']} </s> Tables: {row['context']}"
-        )
+        return f"translate English to SQL: {row['question']} </s> Tables: {row['context']}"
 
     df["input_text"] = df.apply(make_prompt, axis=1)
     df["target_text"] = df["answer"]
@@ -122,9 +120,7 @@ def preprocess(raw_s3_path: str) -> str:
     print(f"Split — train: {len(train_ds)}, val: {len(val_ds)}, test: {len(test_ds)}")
 
     # Also keep raw text for evaluation (exact match / SQL execution)
-    test_df = df.iloc[list(range(len(df) - len(val_ds) - len(test_ds), len(df)))].tail(
-        len(test_ds)
-    )
+    test_df = df.iloc[list(range(len(df) - len(val_ds) - len(test_ds), len(df)))].tail(len(test_ds))
     raw_test_key = "text2sql/processed/test_raw.parquet"
     s3.put_object(Bucket=bucket, Key=raw_test_key, Body=test_df.to_parquet(index=False))
 

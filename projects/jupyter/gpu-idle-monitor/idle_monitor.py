@@ -3,12 +3,13 @@
 GPU Idle-Shutdown Monitor
 
 Sidecar container that monitors a GPU notebook pod for Jupyter kernel/terminal
-activity and SSH sessions. After IDLE_THRESHOLD_SECONDS of detected inactivity
-the pod is deleted via the Kubernetes API, allowing the cluster to reclaim
-expensive GPU resources.
+activity, VS Code Server sessions, and SSH connections. After IDLE_THRESHOLD_SECONDS
+of detected inactivity the pod is deleted via the Kubernetes API, allowing the
+cluster to reclaim expensive GPU resources.
 
 Configuration (environment variables):
   JUPYTER_URL             Jupyter server base URL (default: http://localhost:8888)
+  VSCODE_PORT             Port that code-server listens on (default: 8888)
   JUPYTER_TOKEN_FILE      File containing the JupyterHub API token
                           (default: /var/idle-monitor/token)
   IDLE_THRESHOLD_SECONDS  Seconds of inactivity before pod deletion (default: 1800)
@@ -33,12 +34,12 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 JUPYTER_URL = os.environ.get("JUPYTER_URL", "http://localhost:8888")
+VSCODE_PORT = int(os.environ.get("VSCODE_PORT", "8888"))
 JUPYTER_TOKEN_FILE = os.environ.get("JUPYTER_TOKEN_FILE", "/var/idle-monitor/token")
 IDLE_THRESHOLD_SECONDS = int(os.environ.get("IDLE_THRESHOLD_SECONDS", "1800"))
 CHECK_INTERVAL_SECONDS = int(os.environ.get("CHECK_INTERVAL_SECONDS", "60"))
 POD_NAME = os.environ.get("POD_NAME", "")
 POD_NAMESPACE = os.environ.get("POD_NAMESPACE", "jupyter")
-MARIMO_MODE = os.environ.get("MARIMO_MODE", "false").lower() == "true"
 
 # SSH port in upper-case hex as it appears in /proc/net/tcp local_address field
 _SSH_PORT_HEX = "0016"
@@ -141,20 +142,58 @@ def get_ssh_connections(proc_net_tcp_path: str = "/proc/net/tcp") -> int:
     return count
 
 
+def get_vscode_activity(proc_net_tcp_path: str = "/proc/net/tcp") -> bool:
+    """Return True if VS Code Server has active connections.
+
+    VS Code Server maintains WebSocket connections for each open editor window.
+    We detect activity by checking if there are established connections to the
+    code-server port (configured via VSCODE_PORT env var, default 8888).
+
+    Args:
+        proc_net_tcp_path: Path to the proc file (overridable for unit tests).
+    """
+    try:
+        vscode_port_hex = format(VSCODE_PORT, "04X")
+        count = 0
+
+        with open(proc_net_tcp_path) as fh:
+            next(fh)  # skip header row
+            for line in fh:
+                parts = line.split()
+                if len(parts) < 4:
+                    continue
+                local_addr = parts[1]
+                state = parts[3]
+                if ":" not in local_addr:
+                    continue
+                local_port = local_addr.split(":")[1].upper()
+                if local_port == vscode_port_hex and state == _TCP_ESTABLISHED:
+                    count += 1
+
+        if count > 0:
+            log.info("Active VS Code connections: %d", count)
+            return True
+        return False
+    except OSError as exc:
+        log.debug("Could not check VS Code activity: %s", exc)
+        return False
+
+
 def is_active(token: str = "") -> bool:
     """Return True if any user activity is detected on the pod.
 
-    Checks (in order):
-    1. Jupyter busy kernels or open terminals via the REST API (if not in Marimo mode).
-    2. Marimo active sessions (if in Marimo mode).
+    Checks all activity sources — the combined image may run Jupyter, Marimo,
+    and VS Code simultaneously, so any source being active keeps the pod alive.
+
+    Sources checked:
+    1. Jupyter busy kernels or open terminals (REST API).
+    2. VS Code Server established TCP connections.
     3. Established SSH connections via ``/proc/net/tcp``.
     """
-    if MARIMO_MODE:
-        if get_marimo_activity():
-            return True
-    else:
-        if get_jupyter_activity(token):
-            return True
+    if get_jupyter_activity(token):
+        return True
+    if get_vscode_activity():
+        return True
     ssh_count = get_ssh_connections()
     if ssh_count > 0:
         log.info("Active SSH connections: %d", ssh_count)
@@ -178,11 +217,9 @@ def delete_pod() -> None:
 
 def run() -> None:
     """Main monitoring loop."""
-    mode = "Marimo" if MARIMO_MODE else "Jupyter"
     log.info(
-        "GPU idle-shutdown monitor started (mode: %s) — idle threshold: %ds, "
+        "GPU idle-shutdown monitor started — idle threshold: %ds, "
         "check interval: %ds, pod: %s/%s",
-        mode,
         IDLE_THRESHOLD_SECONDS,
         CHECK_INTERVAL_SECONDS,
         POD_NAMESPACE,

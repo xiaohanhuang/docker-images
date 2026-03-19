@@ -1,0 +1,34 @@
+# Data-CPU Image for LLM-SFT Workflow
+# Purpose: Data ingestion, tokenization, splitting (CPU-only tasks)
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    flytekit==1.13.0 \
+    datasets==2.20.0 \
+    boto3==1.34.0 \
+    pandas==2.2.0 \
+    numpy==1.26.0 \
+    scikit-learn==1.5.0
+
+# Copy shared component library (prepared by `make prepare`)
+COPY components/ /app/components/
+
+# Copy workflow code
+COPY config.py /app/config.py
+COPY tasks/ /app/tasks/
+COPY pipeline.py /app/pipeline.py
+
+# Set Python path
+ENV PYTHONPATH=/app:${PYTHONPATH}
+
+ENTRYPOINT ["python"]

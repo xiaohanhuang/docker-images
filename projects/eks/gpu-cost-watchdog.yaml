@@ -1,0 +1,183 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gpu-cost-watchdog
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gpu-cost-watchdog-role
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    verbs: ["get", "list", "patch", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["gpu-warm-pool"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gpu-cost-watchdog-binding
+subjects:
+  - kind: ServiceAccount
+    name: gpu-cost-watchdog
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: gpu-cost-watchdog-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gpu-cost-watchdog
+  namespace: default
+spec:
+  schedule: "*/10 * * * *"
+  timeZone: "America/New_York"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: gpu-cost-watchdog
+          containers:
+            - name: watchdog
+              image: python:3.11-slim
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  # Install kubectl — pinned version with SHA256 verification
+                  KUBECTL_VERSION="v1.31.2"
+                  if ! command -v kubectl &> /dev/null; then
+                    echo "Installing kubectl ${KUBECTL_VERSION}..."
+                    apt-get update -qq && apt-get install -y -qq curl
+                    curl -sLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+                    curl -sLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+                    echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check --status || {
+                      echo "kubectl checksum verification FAILED" >&2; exit 1;
+                    }
+                    chmod +x kubectl
+                    mv kubectl /usr/local/bin/
+                    rm -f kubectl.sha256
+                  fi
+
+                  python3 - <<'EOF'
+                  import os, time, subprocess, json, urllib.request, urllib.parse, sys
+                  from datetime import datetime, timezone
+
+                  PROM_URL = "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
+                  IDLE_THRESHOLD_GPU = 1.0 
+                  IDLE_THRESHOLD_CPU = 0.05 
+                  IDLE_TIME_SECONDS = 3600
+
+                  def query_prom(query):
+                      try:
+                          url = f"{PROM_URL}/api/v1/query?{urllib.parse.urlencode({'query': query})}"
+                          with urllib.request.urlopen(url, timeout=10) as response:
+                              return json.loads(response.read().decode())
+                      except Exception as e:
+                          # print(f"Prometheus query failed: {e}")
+                          return None
+
+                  def kubectl(args):
+                      return subprocess.check_output(["kubectl"] + args).decode()
+
+                  def is_gpu_pod(pod):
+                      for c in pod.get("spec", {}).get("containers", []):
+                          res = c.get("resources", {})
+                          if "nvidia.com/gpu" in res.get("limits", {}) or "nvidia.com/gpu" in res.get("requests", {}):
+                              return True
+                      return False
+
+                  def get_start_time(pod):
+                      st = pod.get("status", {}).get("startTime")
+                      if not st: return time.time()
+                      try:
+                          return datetime.strptime(st, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+                      except:
+                          return time.time()
+
+                  print(f"--- Smart GPU Watchdog Run: {datetime.now()} ---")
+
+                  try:
+                      pods_json = json.loads(kubectl(["get", "pods", "-A", "-o", "json"]))
+                      all_gpu_pods = [p for p in pods_json["items"] if is_gpu_pod(p)]
+                      target_pods = [p for p in all_gpu_pods if p["metadata"]["labels"].get("app") != "gpu-warm-pool"]
+                  except Exception as e:
+                      print(f"Failed to list pods: {e}")
+                      sys.exit(1)
+
+                  active_pods_count = 0
+
+                  for pod in target_pods:
+                      if pod["status"]["phase"] != "Running": continue
+                      
+                      name, ns = pod["metadata"]["name"], pod["metadata"]["namespace"]
+                      print(f"Checking pod {ns}/{name} (Running for {int((time.time() - get_start_time(pod))/60)}m)")
+
+                      # GPU Util Query
+                      gpu_data = query_prom(f'max_over_time(DCGM_FI_DEV_GPU_UTIL{{pod="{name}", namespace="{ns}"}}[60m])')
+                      util = 0.0
+                      has_metrics = False
+                      if gpu_data and gpu_data.get("data", {}).get("result"):
+                          util = float(gpu_data["data"]["result"][0]["value"][1])
+                          print(f"  GPU Utilization (max 1h): {util}%")
+                          has_metrics = True
+                      
+                      if not has_metrics or util < IDLE_THRESHOLD_GPU:
+                          # Fallback to CPU
+                          cpu_data = query_prom(f'rate(container_cpu_usage_seconds_total{{pod="{name}", namespace="{ns}"}}[60m])')
+                          if cpu_data and cpu_data.get("data", {}).get("result"):
+                              cpu_val = float(cpu_data["data"]["result"][0]["value"][1])
+                              print(f"  CPU Utilization (rate 1h): {cpu_val} cores")
+                              if cpu_val < IDLE_THRESHOLD_CPU:
+                                  util = 0.0 # Truly idle
+                              else:
+                                  util = 100.0 # CPU active
+                          elif not has_metrics:
+                              print(f"  Warning: No metrics. Assuming active.")
+                              util = 100.0 
+
+                      if util < IDLE_THRESHOLD_GPU:
+                          if (time.time() - get_start_time(pod)) > IDLE_TIME_SECONDS:
+                              print(f"  ACTION: Deleting IDLE pod {ns}/{name} (1h inactivity)")
+                              kubectl(["delete", "pod", name, "-n", ns])
+                              continue
+                      
+                      active_pods_count += 1
+
+                  print(f"Active non-warm workloads found: {active_pods_count}")
+
+                  # Warm Pool Management
+                  try:
+                      warm_pool = json.loads(kubectl(["get", "deployment", "gpu-warm-pool", "-o", "json"]))
+                      replicas = warm_pool["spec"]["replicas"]
+                      last_active_str = warm_pool["metadata"].get("annotations", {}).get("last-active-at")
+                      
+                      if active_pods_count > 0:
+                          if replicas == 0:
+                              print("Activity detected! Re-warming cluster.")
+                              kubectl(["scale", "deployment", "gpu-warm-pool", "--replicas=1"])
+                          kubectl(["annotate", "deployment", "gpu-warm-pool", f"last-active-at={int(time.time())}", "--overwrite"])
+                      else:
+                          if replicas > 0:
+                              if not last_active_str:
+                                  kubectl(["annotate", "deployment", "gpu-warm-pool", f"last-active-at={int(time.time())}", "--overwrite"])
+                              else:
+                                  idle_sec = time.time() - int(last_active_str)
+                                  print(f"Cluster idle for {int(idle_sec/60)} minutes.")
+                                  if idle_sec > IDLE_TIME_SECONDS:
+                                      print("ACTION: Scaling Warm Pool to 0 (Long Idle).")
+                                      kubectl(["scale", "deployment", "gpu-warm-pool", "--replicas=0"])
+                  except Exception as e:
+                      pass
+                  EOF
+          restartPolicy: OnFailure

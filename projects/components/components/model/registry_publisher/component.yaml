@@ -1,0 +1,6 @@
+name: registry_publisher
+version: "1.0.0"
+description: "Register fine-tuned models in MLflow"
+category: model
+image: ml-gpu
+tags: [model, mlflow, registry]

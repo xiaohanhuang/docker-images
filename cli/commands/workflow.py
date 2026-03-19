@@ -14,6 +14,7 @@ Commands:
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import time
 
@@ -122,6 +123,8 @@ def _watch_execution(exec_id: str, remote, interval: int = 10):
 
     def _phase_str(phase) -> tuple[str, str]:
         s = WorkflowExecutionPhase.enum_to_string(phase) if hasattr(phase, "real") else str(phase)
+        if s == "SUCCEEDING":
+            s = "SUCCEEDED"
         return s, phase_style_map.get(s, "white")
 
     def _build_dashboard(exec) -> Panel:
@@ -161,19 +164,22 @@ def _watch_execution(exec_id: str, remote, interval: int = 10):
         }
         node_map = {}
         try:
-            remote.sync_execution(exec, sync_nodes=False)
+            remote.sync_execution(exec, sync_nodes=True)
             node_map = {n.id.node_id: n for n in (exec.node_executions or {}).values()}
         except Exception:
             pass
 
+        # Flyte names task nodes n0, n1, n2… in pipeline order — map positionally.
+        data_nodes = sorted(
+            [nid for nid in node_map if re.match(r"^n\d+$", nid)],
+            key=lambda x: int(x[1:]),
+        )
+        node_id_for_task = {task: nid for task, nid in zip(task_order, data_nodes)}
+
         for tname in task_order:
-            found = None
-            for nid, node in node_map.items():
-                if tname in nid:
-                    found = node
-                    break
-            if found:
-                ps, _ = _phase_str(found.closure.phase)
+            node = node_map.get(node_id_for_task.get(tname, ""))
+            if node:
+                ps, _ = _phase_str(node.closure.phase)
                 emoji = task_emoji.get(ps, "⏳")
                 task_table.add_row(tname, f"{emoji} {ps}")
             else:

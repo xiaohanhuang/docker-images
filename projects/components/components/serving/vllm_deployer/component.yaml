@@ -1,0 +1,6 @@
+name: vllm_deployer
+version: "1.0.0"
+description: "Deploy a HuggingFace model as a vLLM inference endpoint"
+category: serving
+image: genai-gpu
+tags: [serving, vllm, deployment, autoscaling]

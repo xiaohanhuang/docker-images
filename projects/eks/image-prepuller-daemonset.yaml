@@ -1,0 +1,104 @@
+# Image pre-pullers: separate DaemonSets for CPU and GPU nodes so each node
+# type only caches images it actually needs.  Avoids DiskPressure on small
+# system nodes caused by pulling multi-GB GPU images everywhere.
+#
+# Images are pinned to the same SHA used in projects/jupyter/helm-values.yaml.
+# Update both locations when rolling out a new image build.
+
+---
+# ── CPU worker nodes: notebook image only ────────────────────────────────────
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: image-prepuller-cpu
+  namespace: jupyter
+spec:
+  selector:
+    matchLabels:
+      app: image-prepuller-cpu
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 100%
+  template:
+    metadata:
+      labels:
+        app: image-prepuller-cpu
+    spec:
+      nodeSelector:
+        role: cpu-worker
+      terminationGracePeriodSeconds: 0
+      priorityClassName: warm-pool-placeholder
+      initContainers:
+        - name: pull-notebook-marimo
+          image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo:12464b930fc0ff3ba16fb00f67ca83689cf203f2
+          command: ["/bin/sh", "-c", "echo pull complete"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+
+---
+# ── GPU worker nodes: notebook + sidecar images ─────────────────────────────
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: image-prepuller-gpu
+  namespace: jupyter
+spec:
+  selector:
+    matchLabels:
+      app: image-prepuller-gpu
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 100%
+  template:
+    metadata:
+      labels:
+        app: image-prepuller-gpu
+    spec:
+      nodeSelector:
+        role: gpu-worker
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      terminationGracePeriodSeconds: 0
+      priorityClassName: warm-pool-placeholder
+      initContainers:
+        - name: pull-notebook-marimo
+          image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo:12464b930fc0ff3ba16fb00f67ca83689cf203f2
+          command: ["/bin/sh", "-c", "echo pull complete"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+        - name: pull-notebook-custom
+          image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-custom:cfb99bd03fe22a3e914fa42e79b0b22eeafa64cd
+          command: ["/bin/sh", "-c", "echo pull complete"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+        - name: pull-gpu-idle-monitor
+          image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/gpu-idle-monitor:e304f180623ec1718a844c056f70e99950c1b491
+          command: ["/bin/sh", "-c", "echo pull complete"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+      containers:
+        - name: pause
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi

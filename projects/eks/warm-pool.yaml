@@ -1,0 +1,121 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: warm-pool-placeholder
+value: -10
+globalDefault: false
+description: "Keeps GPU nodes warm; instantly evicted by real workloads"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: warm-pool-placeholder
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: warm-pool-placeholder
+  template:
+    metadata:
+      labels:
+        app: warm-pool-placeholder
+    spec:
+      priorityClassName: warm-pool-placeholder
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: pause
+        image: registry.k8s.io/pause:3.9
+        resources:
+          requests:
+            nvidia.com/gpu: 1
+          limits:
+            nvidia.com/gpu: 1
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      nodeSelector:
+        role: gpu-worker
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: warm-pool-scaler
+  namespace: default
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: warm-pool-scaler
+  namespace: default
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  resourceNames: ["warm-pool-placeholder"]
+  verbs: ["get", "patch", "update"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: warm-pool-scaler
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: warm-pool-scaler
+  namespace: default
+roleRef:
+  kind: Role
+  name: warm-pool-scaler
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: warm-pool-down
+  namespace: default
+spec:
+  schedule: "0 19 * * 1-5"
+  timeZone: "America/Los_Angeles"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: warm-pool-scaler
+          containers:
+          - name: kubectl
+            image: bitnami/kubectl:1.28
+            command:
+            - /bin/sh
+            - -c
+            - kubectl scale deployment warm-pool-placeholder --replicas=0
+          restartPolicy: OnFailure
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: warm-pool-up
+  namespace: default
+spec:
+  schedule: "0 8 * * 1-5"
+  timeZone: "America/Los_Angeles"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: warm-pool-scaler
+          containers:
+          - name: kubectl
+            image: bitnami/kubectl:1.28
+            command:
+            - /bin/sh
+            - -c
+            - kubectl scale deployment warm-pool-placeholder --replicas=1
+          restartPolicy: OnFailure

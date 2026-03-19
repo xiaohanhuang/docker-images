@@ -1,0 +1,121 @@
+# AWS Node Termination Handler in IMDS mode
+# Detects Spot Interruptions, Scheduled Events, and ASG Terminations via IMDS
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aws-node-termination-handler
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-node-termination-handler
+    app.kubernetes.io/instance: aws-node-termination-handler
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aws-node-termination-handler
+      app.kubernetes.io/instance: aws-node-termination-handler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aws-node-termination-handler
+        app.kubernetes.io/instance: aws-node-termination-handler
+    spec:
+      serviceAccountName: aws-node-termination-handler
+      hostNetwork: true
+      priorityClassName: system-node-critical
+      tolerations:
+        # Run on GPU nodes (tainted nvidia.com/gpu=true:NoSchedule) so NTH
+        # can drain training pods when a spot GPU instance is reclaimed.
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        # Also tolerate standard node-role taints so NTH runs everywhere.
+        - operator: Exists
+          effect: NoExecute
+        - operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: aws-node-termination-handler
+          image: public.ecr.aws/aws-ec2/aws-node-termination-handler:v1.21.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: SPOT_INTERRUPTION_DURABLE_STORE
+              value: "true"
+            - name: ENABLE_SPOT_INTERRUPTION_DRAINING
+              value: "true"
+            - name: ENABLE_SCHEDULED_EVENT_DRAINING
+              value: "false"
+            - name: ENABLE_REBALANCE_MONITORING
+              value: "true"
+            - name: ENABLE_REBALANCE_DRAINING
+              value: "false"
+            - name: DELETE_LOCAL_DATA
+              value: "true"
+            - name: IGNORE_DAEMONSETS
+              value: "true"
+            - name: GRACE_PERIOD
+              value: "120"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aws-node-termination-handler
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: aws-node-termination-handler
+    app.kubernetes.io/instance: aws-node-termination-handler
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: aws-node-termination-handler
+  labels:
+    app.kubernetes.io/name: aws-node-termination-handler
+    app.kubernetes.io/instance: aws-node-termination-handler
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "get"]
+  - apiGroups: [""]
+    resources: ["pods/eviction"]
+    verbs: ["create"]
+  - apiGroups: ["extensions", "apps"]
+    resources: ["daemonsets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: aws-node-termination-handler
+  labels:
+    app.kubernetes.io/name: aws-node-termination-handler
+    app.kubernetes.io/instance: aws-node-termination-handler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: aws-node-termination-handler
+subjects:
+  - kind: ServiceAccount
+    name: aws-node-termination-handler
+    namespace: kube-system

@@ -5,35 +5,29 @@ import { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { ErrorMessage } from '@/components/ErrorMessage';
 import { api } from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 
 export default function KubernetesPage() {
-  const [selectedPod, setSelectedPod] = useState<string | null>(null);
   const [selectedNamespace, setSelectedNamespace] = useState<string>('default');
 
-  const { data: pods, isLoading: podsLoading, error: podsError } = useQuery({
+  const { data: pods, isLoading: podsLoading } = useQuery({
     queryKey: ['k8s-pods', selectedNamespace],
     queryFn: () => api.pods.list(selectedNamespace),
   });
 
-  const { data: nodes, isLoading: nodesLoading, error: nodesError } = useQuery({
+  const { data: nodes, isLoading: nodesLoading } = useQuery({
     queryKey: ['k8s-nodes'],
     queryFn: () => api.kubernetes.listNodes(),
   });
 
-  const { data: events, isLoading: eventsLoading, error: eventsError } = useQuery({
+  const { data: events, isLoading: eventsLoading } = useQuery({
     queryKey: ['k8s-events', selectedNamespace],
     queryFn: () => api.kubernetes.listEvents(selectedNamespace),
   });
 
   if (podsLoading || nodesLoading || eventsLoading) {
     return <LoadingSpinner />;
-  }
-
-  if (podsError || nodesError || eventsError) {
-    return <ErrorMessage message="Failed to load Kubernetes data" />;
   }
 
   return (
@@ -129,8 +123,8 @@ export default function KubernetesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {pods?.map((pod: any) => (
-                  <tr key={pod.name} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedPod(pod.name)}>
+                {pods?.map((pod) => (
+                  <tr key={pod.name} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {pod.name}
                     </td>

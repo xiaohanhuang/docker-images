@@ -1,6 +1,4 @@
-import socket
 import subprocess
-import time
 import webbrowser
 
 import typer
@@ -10,69 +8,54 @@ console = Console()
 app = typer.Typer(help="Manage Jupyter notebook sessions")
 
 
+def _get_jupyter_url(namespace: str) -> str | None:
+    """Discover JupyterHub URL from the Kubernetes ingress."""
+    try:
+        result = subprocess.run(
+            [
+                "kubectl",
+                "get",
+                "ingress",
+                "jupyterhub",
+                "-n",
+                namespace,
+                "-o",
+                "jsonpath={.status.loadBalancer.ingress[0].hostname}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        hostname = result.stdout.strip()
+        if hostname:
+            return f"http://{hostname}"
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    return None
+
+
 @app.command("open")
 def open_notebook(
     namespace: str = typer.Option("jupyter", help="JupyterHub namespace"),
-    port: int = typer.Option(8080, help="Local port to forward to"),
-    ide: str = typer.Option("jupyter", help="IDE to use: jupyter, marimo, or vscode"),
 ):
     """
     Open JupyterHub in your browser.
-    Sets up port-forwarding and opens the URL automatically.
+
+    Discovers the JupyterHub URL from the cluster ingress and opens it.
+    JupyterLab provides Jupyter notebooks, Marimo, VS Code, and terminal
+    from the Launcher.
     """
-    if ide not in ["jupyter", "marimo", "vscode"]:
-        console.print(f"[bold red]Invalid IDE: {ide}[/bold red]")
-        console.print("Valid options: jupyter, marimo, vscode")
+    url = _get_jupyter_url(namespace)
+    if not url:
+        console.print(
+            "[bold red]Could not discover JupyterHub URL.[/bold red]\n"
+            "Check that the jupyterhub ingress exists:\n"
+            f"  kubectl get ingress jupyterhub -n {namespace}"
+        )
         raise typer.Exit(1)
 
-    ide_name = "JupyterHub" if ide == "jupyter" else ide.capitalize()
-    console.print(f"[dim]Setting up port-forward to {ide_name}...[/dim]")
-
-    cmd = [
-        "kubectl",
-        "port-forward",
-        "svc/proxy-public",
-        f"{port}:80",
-        "-n",
-        namespace,
-    ]
-
-    try:
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        # Wait until port is actually listening (up to 10 s)
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            if process.poll() is not None:
-                console.print(
-                    f"[bold red]Failed to start {ide_name} port-forward.[/bold red] "
-                    "Check kubectl auth/context."
-                )
-                raise typer.Exit(1)
-            try:
-                with socket.create_connection(("127.0.0.1", port), timeout=0.5):
-                    break
-            except OSError:
-                time.sleep(0.2)
-        else:
-            process.terminate()
-            console.print(f"[bold red]Timed out waiting for {ide_name} on port {port}.[/bold red]")
-            raise typer.Exit(1)
-
-        url = f"http://localhost:{port}"
-        console.print(f"\n[bold green]✅ {ide_name} available at: {url}[/bold green]")
-        if ide == "marimo":
-            console.print(
-                "[dim]Note: Select a Marimo profile when spawning your server in JupyterHub[/dim]"
-            )
-        console.print("Press Ctrl+C to stop.\n")
-
-        webbrowser.open(url)
-        process.wait()
-
-    except KeyboardInterrupt:
-        console.print("\nStopping port-forward...")
-        process.terminate()
+    webbrowser.open(url)
+    console.print(f"[bold green]✅ Opened JupyterHub: {url}[/bold green]")
 
 
 @app.command("status")

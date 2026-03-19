@@ -1,0 +1,188 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres
+---
+# SECURITY: Do NOT commit real passwords to this file.
+# Create the postgres-credentials Secret externally before applying this manifest:
+#
+#   kubectl create secret generic postgres-credentials \
+#     -n postgres \
+#     --from-literal=POSTGRES_USER=flyte \
+#     --from-literal=POSTGRES_PASSWORD=<your-password> \
+#     --from-literal=POSTGRES_DB=flyte
+#
+# Or provision via AWS Secrets Manager / a GitOps secrets operator.
+# The block below exists only to declare the expected keys; it must be
+# replaced with the externally-created version before first apply.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: postgres
+type: Opaque
+# stringData is intentionally empty here — populate via the kubectl command above.
+# stringData:
+#   POSTGRES_USER: "flyte"
+#   POSTGRES_PASSWORD: "<set-externally>"
+#   POSTGRES_DB: "flyte"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: postgres
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      nodeSelector:
+        role: system
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_DB
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "flyte"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "flyte"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: postgres
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+  selector:
+    app: postgres
+---
+# Init job: create the recipes table after Postgres is ready
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-init-recipes
+  namespace: postgres
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      nodeSelector:
+        role: system
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-pg
+          image: postgres:15-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres.postgres.svc.cluster.local -U flyte; do
+                echo "Waiting for postgres..."
+                sleep 2
+              done
+      containers:
+        - name: init
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+          command:
+            - psql
+            - -h
+            - postgres.postgres.svc.cluster.local
+            - -U
+            - flyte
+            - -d
+            - flyte
+            - -c
+            - |
+              CREATE TABLE IF NOT EXISTS recipe_registry (
+                recipe_name    TEXT NOT NULL,
+                version        TEXT NOT NULL,
+                s3_key         TEXT NOT NULL,
+                archive_name   TEXT NOT NULL,
+                verification_status TEXT NOT NULL DEFAULT 'experimental',
+                verified_profile    TEXT,
+                verified_at    TIMESTAMPTZ,
+                tags           TEXT[] DEFAULT '{}',
+                pushed_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                metadata       JSONB DEFAULT '{}',
+                PRIMARY KEY (recipe_name, version)
+              );
+              CREATE INDEX IF NOT EXISTS idx_recipe_status
+                ON recipe_registry (verification_status);
+              CREATE INDEX IF NOT EXISTS idx_recipe_tags
+                ON recipe_registry USING gin (tags);

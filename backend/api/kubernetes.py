@@ -10,16 +10,17 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Initialize Kubernetes client
-try:
-    config.load_incluster_config()
-except config.ConfigException:
-    try:
-        config.load_kube_config()
-    except config.ConfigException:
-        logger.warning("Failed to load Kubernetes config")
 
-v1 = client.CoreV1Api()
+def _get_v1() -> client.CoreV1Api:
+    """Return a CoreV1Api client, loading k8s config on first use."""
+    try:
+        config.load_incluster_config()
+    except config.ConfigException:
+        try:
+            config.load_kube_config()
+        except config.ConfigException:
+            logger.warning("Failed to load Kubernetes config")
+    return client.CoreV1Api()
 
 
 @router.get("/nodes")
@@ -31,6 +32,7 @@ async def list_nodes() -> list[dict[str, Any]]:
         List of node information
     """
     try:
+        v1 = _get_v1()
         nodes = v1.list_node(_request_timeout=10)
         node_list = []
 
@@ -74,6 +76,7 @@ async def list_events(namespace: str | None = Query(None)) -> list[dict[str, Any
         List of events
     """
     try:
+        v1 = _get_v1()
         if namespace:
             events = v1.list_namespaced_event(namespace, _request_timeout=10)
         else:
@@ -121,6 +124,7 @@ async def get_pod_logs(pod_name: str, namespace: str = Query("default")) -> dict
         Dict containing pod logs
     """
     try:
+        v1 = _get_v1()
         logs = v1.read_namespaced_pod_log(
             name=pod_name, namespace=namespace, tail_lines=1000, timestamps=True
         )

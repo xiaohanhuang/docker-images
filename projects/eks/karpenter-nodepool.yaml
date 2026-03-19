@@ -1,0 +1,302 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: cpu-nodeclass
+spec:
+  amiFamily: AL2023
+  role: karpenter-node-ml-platform-eks
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: ml-platform-eks
+    - tags:
+        kubernetes.io/role/internal-elb: "1"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: ml-platform-eks
+    - tags:
+        kubernetes.io/cluster/ml-platform-eks: owned
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        encrypted: true
+        deleteOnTermination: true
+
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: gpu-nodeclass
+spec:
+  amiFamily: AL2023
+  # NOTE: Karpenter's AL2023 auto-resolution (alias: al2023@latest) maps GPU instances
+  # to the neuron AMI variant, not the nvidia variant. We pin to the nvidia AMI name
+  # pattern to ensure GPU nodes get the correct AMI with pre-installed NVIDIA drivers,
+  # container toolkit, and containerd nvidia runtime configuration.
+  amiSelectorTerms:
+    - name: "amazon-eks-node-al2023-x86_64-nvidia-1.34-*"
+      owner: "amazon"
+  role: karpenter-node-ml-platform-eks
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: ml-platform-eks
+    - tags:
+        kubernetes.io/role/internal-elb: "1"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: ml-platform-eks
+    - tags:
+        kubernetes.io/cluster/ml-platform-eks: owned
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 200Gi
+        volumeType: gp3
+        iops: 6000
+        throughput: 500
+        encrypted: true
+        deleteOnTermination: true
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="==BOUNDARY=="
+
+    --==BOUNDARY==
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    set -ex
+
+    # The EKS nvidia AMI already has drivers, container toolkit, and containerd
+    # runtime configured. We just need to create device nodes and CDI specs.
+
+    # Wait for NVIDIA drivers to be loaded
+    for i in $(seq 1 30); do
+      nvidia-smi -L && break || sleep 2
+    done
+
+    # Create device nodes (nvidia AMI doesn't run nvidia-modprobe at boot)
+    nvidia-modprobe -u -c=0 -m
+
+    # Generate CDI spec for GPU device injection (required for containerd 2.x)
+    mkdir -p /etc/cdi
+    nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml
+
+    echo "GPU setup complete: $(nvidia-smi -L)"
+
+    --==BOUNDARY==--
+
+---
+# Shared GPU nodepool for time-sliced workloads (on-demand, g5 only)
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: shared-gpu-nodepool
+spec:
+  template:
+    metadata:
+      labels:
+        role: gpu-worker
+        nvidia.com/device-plugin.config: "time-slicing"
+    spec:
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-west-2b"]
+        - key: "karpenter.k8s.aws/instance-family"
+          operator: In
+          values: ["g5"]
+        - key: "karpenter.k8s.aws/instance-size"
+          operator: In
+          values: ["xlarge", "2xlarge", "4xlarge"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu-nodeclass
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+      expireAfter: 720h
+  limits:
+    cpu: 1000
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 60s
+
+---
+# General GPU nodepool for training (on-demand, g5 + A100 families)
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu-nodepool
+spec:
+  template:
+    metadata:
+      labels:
+        role: gpu-worker
+        nvidia.com/device-plugin.config: "time-slicing"
+    spec:
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-west-2b"]
+        - key: "karpenter.k8s.aws/instance-family"
+          operator: In
+          values: ["g5", "p4d", "p4de"]
+        - key: "karpenter.k8s.aws/instance-size"
+          operator: NotIn
+          values: ["nano", "micro", "small", "medium", "large"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu-nodeclass
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+      expireAfter: 720h
+  limits:
+    cpu: 1000
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 30s
+
+---
+# Inference GPU nodepool (on-demand, g5 small sizes)
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: inference-gpu-nodepool
+spec:
+  template:
+    metadata:
+      labels:
+        role: gpu-worker
+        workload-type: inference
+    spec:
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-west-2b"]
+        - key: "karpenter.k8s.aws/instance-family"
+          operator: In
+          values: ["g5"]
+        - key: "karpenter.k8s.aws/instance-size"
+          operator: In
+          values: ["xlarge", "2xlarge", "4xlarge"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu-nodeclass
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+      expireAfter: 720h
+  limits:
+    cpu: 1000
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 60s
+
+---
+# Spot GPU nodepool for fault-tolerant training jobs
+# Uses both spot and on-demand, all g5 sizes, with atomic checkpoint support
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: training-spot-gpu-nodepool
+spec:
+  template:
+    metadata:
+      labels:
+        role: gpu-worker
+    spec:
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-west-2b"]
+        - key: "karpenter.k8s.aws/instance-family"
+          operator: In
+          values: ["g5"]
+        - key: "karpenter.k8s.aws/instance-size"
+          operator: In
+          values: ["xlarge", "2xlarge", "4xlarge", "12xlarge", "48xlarge"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu-nodeclass
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+      expireAfter: 720h
+  limits:
+    cpu: 1000
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 30s
+
+---
+# CPU nodepool for non-GPU workloads
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: cpu-nodepool
+spec:
+  template:
+    metadata:
+      labels:
+        role: cpu-worker
+    spec:
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["us-west-2b"]
+        - key: "karpenter.k8s.aws/instance-family"
+          operator: In
+          values: ["m5", "m5a", "m6i", "m6a"]
+        - key: "karpenter.k8s.aws/instance-size"
+          operator: NotIn
+          values: ["nano", "micro", "small", "medium", "large"]
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: cpu-nodeclass
+      expireAfter: 720h
+  limits:
+    cpu: 1000
+  disruption:
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 30s

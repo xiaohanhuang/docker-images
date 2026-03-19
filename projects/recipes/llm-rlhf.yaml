@@ -1,0 +1,328 @@
+# RLHF Alignment Recipe — engine-schema compatible
+# Full pipeline: SFT → Preference Data → Reward Model → PPO → Evaluate → Publish
+#
+# Component output references:
+#   hf_dataset_loader        -> FlyteFile            -> o0
+#   lora_finetune            -> Tuple[str,str,Dict]  -> o0 (checkpoint), o1 (run_id), o2 (metrics)
+#   generate_preference_data -> Tuple[str,int,float] -> o0 (path), o1 (count), o2 (score)
+#   train_reward_model       -> RewardModelOutput    -> .checkpoint_path, .accuracy, ...
+#   benchmark_reward_model   -> Dict[str,object]     -> o0
+#   rlhf_trainer             -> RLHFTrainerOutput    -> .checkpoint_path, .kl_divergence, ...
+#   llm_judge                -> dict                 -> o0
+#   registry_publisher       -> str                  -> o0
+
+name: llm-rlhf
+version: "1.0"
+description: "Full RLHF alignment pipeline (SFT → Reward → PPO)"
+author: ml-platform-team
+tags: [llm, rlhf, alignment, reinforcement-learning, genai]
+
+# Pin each component to a known-good version.
+# Per-step `version` overrides these; omit an entry to use latest.
+component_versions:
+  components.data.hf_dataset_loader.hf_dataset_loader: "1.0.0"
+  components.training.lora_finetune.lora_finetune: "1.0.0"
+  components.data.preference_data_generator.generate_preference_data: "1.0.0"
+  components.training.reward_model_trainer.train_reward_model: "1.0.0"
+  components.evaluation.reward_bench.benchmark_reward_model: "1.0.0"
+  components.training.rlhf_trainer.rlhf_trainer: "1.0.0"
+  components.evaluation.llm_judge.llm_judge: "1.0.0"
+  components.model.registry_publisher.registry_publisher: "1.0.0"
+
+infrastructure:
+  profiles:
+    small:
+      # 1x A10G (24 GB) per role — fits on a single g5.2xlarge each
+      actor:
+        instance_types: [g5.2xlarge]
+        gpu_count: 1
+        gpu_memory: 24GB
+        cpu: "8"
+        memory: "32GB"
+      critic:
+        instance_types: [g5.2xlarge]
+        gpu_count: 1
+        gpu_memory: 24GB
+        cpu: "8"
+        memory: "32GB"
+    medium:
+      # 4x A10G for actor, 1x for critic
+      actor:
+        instance_types: [g5.12xlarge]
+        gpu_count: 4
+        gpu_memory: 96GB
+        cpu: "48"
+        memory: "192GB"
+      critic:
+        instance_types: [g5.4xlarge]
+        gpu_count: 1
+        gpu_memory: 24GB
+        cpu: "16"
+        memory: "64GB"
+
+  storage:
+    checkpoints: efs
+    datasets: s3
+
+  node_pool_overrides:
+    consolidation_policy: WhenEmpty
+    ttl_after_empty: 300s
+
+pipeline:
+  parameters:
+    base_model:
+      type: string
+      default: "facebook/opt-125m"
+      description: "HuggingFace model ID for base model"
+
+    dataset:
+      type: string
+      default: "Anthropic/hh-rlhf"
+      description: "HuggingFace dataset name for RLHF training"
+
+    model_name:
+      type: string
+      default: "test-rlhf"
+      description: "Name to register the final aligned model under"
+
+    dataset_subset:
+      type: string
+      default: ""
+      description: "Optional dataset subset (empty string = load all)"
+
+    num_train_samples:
+      type: int
+      default: 1000
+      description: "Number of training samples to load from dataset"
+
+    sft_epochs:
+      type: int
+      default: 3
+      description: "Number of supervised fine-tuning epochs"
+
+    sft_lr:
+      type: float
+      default: 0.0002
+      description: "SFT learning rate"
+
+    lora_rank:
+      type: int
+      default: 16
+      description: "LoRA rank (r) parameter"
+
+    judge_model:
+      type: string
+      default: "heuristic"
+      description: "LLM judge model for preference and alignment evaluation"
+
+    samples_per_prompt:
+      type: int
+      default: 2
+      description: "Candidate responses per prompt for preference generation"
+
+    rm_epochs:
+      type: int
+      default: 1
+      description: "Number of reward model training epochs"
+
+    rm_lr:
+      type: float
+      default: 0.00001
+      description: "Reward model learning rate"
+
+    rm_batch_size:
+      type: int
+      default: 4
+      description: "Reward model batch size per GPU"
+
+    ppo_epochs:
+      type: int
+      default: 1
+      description: "Number of PPO outer training epochs"
+
+    ppo_rollouts:
+      type: int
+      default: 1024
+      description: "Number of rollouts to collect per PPO epoch"
+
+    ppo_lr:
+      type: float
+      default: 0.00001
+      description: "PPO actor learning rate"
+
+    kl_coef:
+      type: float
+      default: 0.1
+      description: "KL divergence penalty coefficient"
+
+    algorithm:
+      type: string
+      default: "ppo"
+      description: "RL algorithm: ppo, reinforce, grpo, rloo, reinforce_baseline"
+
+    registry_type:
+      type: string
+      default: "mlflow"
+      description: "Model registry backend (mlflow, s3, huggingface)"
+
+  steps:
+    # ── Step 1: Load dataset ────────────────────────────────────────────────
+    - name: load_dataset
+      component: components.data.hf_dataset_loader.hf_dataset_loader
+      infra: null
+      config:
+        dataset_name: "{{ parameters.dataset }}"
+        split: train
+        subset: "{{ parameters.dataset_subset }}"
+        num_samples: "{{ parameters.num_train_samples }}"
+
+    # ── Step 2: Supervised fine-tuning with LoRA ───────────────────────────
+    - name: sft
+      component: components.training.lora_finetune.lora_finetune
+      infra: actor
+      depends_on: [load_dataset]
+      config:
+        base_model: "{{ parameters.base_model }}"
+        train_data_path: "{{ steps.load_dataset.outputs.o0 }}"
+        val_data_path: null
+        method: "lora"
+        lora_r: "{{ parameters.lora_rank }}"
+        lora_alpha: 32
+        lora_target_modules: null
+        epochs: "{{ parameters.sft_epochs }}"
+        batch_size: 4
+        learning_rate: "{{ parameters.sft_lr }}"
+        gradient_accumulation_steps: 4
+        mlflow_experiment: null
+        trust_remote_code: false
+
+    # ── Step 3: Generate preference pairs using LLM judge ─────────────────
+    - name: generate_preferences
+      component: components.data.preference_data_generator.generate_preference_data
+      infra: actor
+      depends_on: [sft]
+      config:
+        prompt_data_path: "{{ steps.load_dataset.outputs.o0 }}"
+        generator_model: "{{ parameters.base_model }}"
+        prompt_column: "chosen"
+        judge_model: "{{ parameters.judge_model }}"
+        n_candidates: "{{ parameters.samples_per_prompt }}"
+        judge_criteria: "helpfulness, accuracy, safety"
+        output_format: dpo
+        scored_data_path: null
+
+    # ── Step 4: Train reward model on preference data ──────────────────────
+    - name: train_reward_model
+      component: components.training.reward_model_trainer.train_reward_model
+      infra: critic
+      depends_on: [generate_preferences]
+      config:
+        base_model: "{{ parameters.base_model }}"
+        preference_data_path: "{{ steps.generate_preferences.outputs.o0 }}"
+        prompt_column: "prompt"
+        chosen_column: "chosen"
+        rejected_column: "rejected"
+        modeling_type: "bradley_terry"
+        epochs: "{{ parameters.rm_epochs }}"
+        learning_rate: "{{ parameters.rm_lr }}"
+        batch_size: "{{ parameters.rm_batch_size }}"
+        gradient_accumulation_steps: 4
+        max_length: 512
+        use_lora: true
+        lora_rank: "{{ parameters.lora_rank }}"
+        lora_alpha: 32
+        num_gpus: 1
+        mlflow_tracking_uri: ""
+        mlflow_experiment_name: "reward-model-training"
+
+    # ── Step 5: Benchmark reward model on held-out preferences ────────────
+    - name: evaluate_reward
+      component: components.evaluation.reward_bench.benchmark_reward_model
+      infra: critic
+      depends_on: [train_reward_model]
+      config:
+        reward_model_path: "{{ steps.train_reward_model.outputs.checkpoint_path }}"
+        benchmark: rewardbench
+        categories: null
+        batch_size: 8
+
+    # ── Step 6: RL alignment (OpenRLHF) ──────────────────────────────────
+    - name: ppo_alignment
+      component: components.training.rlhf_trainer.rlhf_trainer
+      infra: actor
+      depends_on: [sft, train_reward_model, evaluate_reward]
+      config:
+        sft_model_path: "{{ steps.sft.outputs.o0 }}"
+        reward_model_path: "{{ steps.train_reward_model.outputs.checkpoint_path }}"
+        dataset_path: "{{ steps.load_dataset.outputs.o0 }}"
+        algorithm: "{{ parameters.algorithm }}"
+        prompt_column: "prompt"
+        ppo_epochs: "{{ parameters.ppo_epochs }}"
+        learning_rate: "{{ parameters.ppo_lr }}"
+        batch_size: 4
+        mini_batch_size: 1
+        kl_penalty: "kl"
+        init_kl_coef: "{{ parameters.kl_coef }}"
+        target_kl: 0.1
+        max_new_tokens: 128
+        num_gpus: 1
+        gradient_checkpointing: true
+        use_deepspeed: false
+        checkpoint_interval: -1
+        num_training_steps: 1000
+
+    # ── Step 7: Evaluate alignment quality with LLM judge ─────────────────
+    - name: evaluate_alignment
+      component: components.evaluation.llm_judge.llm_judge
+      infra: null
+      depends_on: [ppo_alignment]
+      config:
+        predictions_path: "{{ steps.ppo_alignment.outputs.checkpoint_path }}"
+        ground_truth_path: "{{ steps.load_dataset.outputs.o0 }}"
+        judge_model: "{{ parameters.judge_model }}"
+        scorers: ["helpfulness", "safety", "accuracy"]
+        custom_rubric: null
+        sample_size: 200
+        thresholds: null
+        mlflow_experiment: null
+
+    # ── Step 8: Register aligned model to MLflow ───────────────────────────
+    - name: publish
+      component: components.model.registry_publisher.registry_publisher
+      infra: null
+      depends_on: [evaluate_alignment]
+      config:
+        checkpoint_path: "{{ steps.ppo_alignment.outputs.checkpoint_path }}"
+        model_name: "{{ parameters.model_name }}"
+        base_model: "{{ parameters.base_model }}"
+        eval_metrics: "{{ steps.evaluate_alignment.outputs.o0 }}"
+        training_method: "rlhf"
+
+presets:
+  # ── Small: smoke-test on a single g5.2xlarge, opt-125m, 100 samples ─────
+  small:
+    profile: small
+    overrides:
+      parameters.base_model: "facebook/opt-125m"
+      parameters.num_train_samples: 100
+      parameters.sft_epochs: 1
+      parameters.lora_rank: 8
+      parameters.samples_per_prompt: 2
+      parameters.rm_epochs: 1
+      parameters.rm_batch_size: 2
+      parameters.ppo_epochs: 1
+      parameters.ppo_rollouts: 64
+
+  # ── Medium: production-quality run, 13B-class model, full data ──────────
+  medium:
+    profile: medium
+    overrides:
+      parameters.base_model: "meta-llama/Llama-3.1-8B"
+      parameters.num_train_samples: 10000
+      parameters.sft_epochs: 3
+      parameters.lora_rank: 32
+      parameters.samples_per_prompt: 4
+      parameters.rm_epochs: 2
+      parameters.rm_batch_size: 8
+      parameters.ppo_epochs: 2
+      parameters.ppo_rollouts: 512

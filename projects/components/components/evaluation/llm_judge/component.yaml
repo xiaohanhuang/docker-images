@@ -1,0 +1,6 @@
+name: llm_judge
+version: "1.0.0"
+description: "LLM-as-Judge for evaluating model outputs"
+category: evaluation
+image: ml-gpu
+tags: [evaluation, llm-judge, alignment]

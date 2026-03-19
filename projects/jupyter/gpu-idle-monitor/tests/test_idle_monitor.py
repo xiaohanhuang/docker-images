@@ -133,6 +133,38 @@ class TestGetSshConnections:
 
 
 # ---------------------------------------------------------------------------
+# get_vscode_activity
+# ---------------------------------------------------------------------------
+
+
+class TestGetVscodeActivity:
+    _HEADER = "  sl  local_address rem_address   st\n"
+
+    def _write_tcp(self, tmp_path, lines):
+        f = tmp_path / "tcp"
+        f.write_text(self._HEADER + "".join(lines))
+        return str(f)
+
+    def test_returns_true_when_vscode_connections_exist(self, tmp_path):
+        # Port 8888 = 0x22B8; state 01 = ESTABLISHED
+        path = self._write_tcp(
+            tmp_path,
+            [
+                "   0: 00000000:22B8 0A000002:D7F4 01 00000000:00000000\n",
+                "   1: 00000000:22B8 0A000003:C1F2 01 00000000:00000000\n",
+            ],
+        )
+        assert idle_monitor.get_vscode_activity(path) is True
+
+    def test_returns_false_when_no_vscode_connections(self, tmp_path):
+        path = self._write_tcp(tmp_path, [])
+        assert idle_monitor.get_vscode_activity(path) is False
+
+    def test_returns_false_on_file_error(self):
+        assert idle_monitor.get_vscode_activity("/nonexistent/tcp") is False
+
+
+# ---------------------------------------------------------------------------
 # is_active
 # ---------------------------------------------------------------------------
 
@@ -140,18 +172,27 @@ class TestGetSshConnections:
 class TestIsActive:
     def test_active_when_jupyter_busy(self):
         with patch.object(idle_monitor, "get_jupyter_activity", return_value=True):
-            with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
-                assert idle_monitor.is_active("tok") is True
+            with patch.object(idle_monitor, "get_vscode_activity", return_value=False):
+                with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
+                    assert idle_monitor.is_active("tok") is True
+
+    def test_active_when_vscode_has_connections(self):
+        with patch.object(idle_monitor, "get_jupyter_activity", return_value=False):
+            with patch.object(idle_monitor, "get_vscode_activity", return_value=True):
+                with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
+                    assert idle_monitor.is_active("tok") is True
 
     def test_active_when_ssh_connected(self):
         with patch.object(idle_monitor, "get_jupyter_activity", return_value=False):
-            with patch.object(idle_monitor, "get_ssh_connections", return_value=2):
-                assert idle_monitor.is_active("tok") is True
+            with patch.object(idle_monitor, "get_vscode_activity", return_value=False):
+                with patch.object(idle_monitor, "get_ssh_connections", return_value=2):
+                    assert idle_monitor.is_active("tok") is True
 
-    def test_inactive_when_both_idle(self):
+    def test_inactive_when_all_idle(self):
         with patch.object(idle_monitor, "get_jupyter_activity", return_value=False):
-            with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
-                assert idle_monitor.is_active("tok") is False
+            with patch.object(idle_monitor, "get_vscode_activity", return_value=False):
+                with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
+                    assert idle_monitor.is_active("tok") is False
 
 
 # ---------------------------------------------------------------------------
@@ -222,27 +263,7 @@ class TestGetMarimoActivity:
 
 
 # ---------------------------------------------------------------------------
-# is_active with Marimo mode
+# is_active — all sources checked regardless of mode
 # ---------------------------------------------------------------------------
-
-
-class TestIsActiveMarimo:
-    def test_marimo_mode_checks_marimo_activity(self):
-        with patch.object(idle_monitor, "MARIMO_MODE", True):
-            with patch.object(idle_monitor, "get_marimo_activity", return_value=True):
-                with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
-                    assert idle_monitor.is_active("") is True
-
-    def test_marimo_mode_inactive(self):
-        with patch.object(idle_monitor, "MARIMO_MODE", True):
-            with patch.object(idle_monitor, "get_marimo_activity", return_value=False):
-                with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
-                    assert idle_monitor.is_active("") is False
-
-    def test_jupyter_mode_does_not_check_marimo(self):
-        with patch.object(idle_monitor, "MARIMO_MODE", False):
-            with patch.object(idle_monitor, "get_jupyter_activity", return_value=False):
-                with patch.object(idle_monitor, "get_marimo_activity") as mock_marimo:
-                    with patch.object(idle_monitor, "get_ssh_connections", return_value=0):
-                        idle_monitor.is_active("tok")
-                        mock_marimo.assert_not_called()
+# (Covered by TestIsActive above — Marimo activity is checked via Jupyter API.
+#  get_marimo_activity is tested independently in TestGetMarimoActivity.)

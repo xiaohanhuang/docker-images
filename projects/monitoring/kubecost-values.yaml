@@ -1,0 +1,43 @@
+# Kubecost Helm Values
+# Integrated with existing Prometheus + Grafana stack
+
+global:
+  prometheus:
+    enabled: false
+    fqdn: "http://kube-prometheus-stack-prometheus.monitoring:9090"
+  grafana:
+    enabled: false
+    proxy: false
+
+prometheus:
+  server:
+    enabled: false
+
+kubecostProductConfigs:
+  clusterName: ml-platform-eks
+  # Enable GPU cost tracking
+  projectID: ml-platform
+
+# Disable bundled components that we already have
+serviceAccounts:
+  nodeExporter:
+    create: false
+  kubeStateMetrics:
+    create: false
+
+nodeExporter:
+  enabled: false
+
+kubeStateMetrics:
+  enabled: false
+
+# Let Prometheus (kube-prometheus-stack) scrape Kubecost metrics
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    release: kube-prometheus-stack
+
+prometheusRule:
+  enabled: true
+  additionalLabels:
+    release: kube-prometheus-stack

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import cost, dashboard, jobs, kubernetes, mlflow, notebooks, pods, ray
+from backend.api import chat, cost, dashboard, jobs, kubernetes, mlflow, notebooks, pods, ray
 
 # Configure logging
 logging.basicConfig(
@@ -36,7 +36,8 @@ app = FastAPI(
 
 # Configure CORS – restrict origins in production via CORS_ALLOWED_ORIGINS env var
 _default_origins = (
-    "http://localhost:3000,http://ml-platform-dashboard.ml-platform.svc.cluster.local"
+    "http://localhost:3000,http://localhost:3001,"
+    "http://ml-platform-dashboard.ml-platform.svc.cluster.local"
 )
 app.add_middleware(
     CORSMiddleware,
@@ -70,6 +71,7 @@ app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 app.include_router(mlflow.router, prefix="/mlflow", tags=["mlflow"])
 app.include_router(ray.router, prefix="/ray", tags=["ray"])
 app.include_router(kubernetes.router, prefix="/kubernetes", tags=["kubernetes"])
+app.include_router(chat.router, prefix="/chat", tags=["chat"])
 
 
 @app.get("/")

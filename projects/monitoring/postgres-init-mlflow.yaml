@@ -1,0 +1,70 @@
+# PostgreSQL initialization job for MLflow database
+# This Job creates the 'mlflow' database and user on the existing PostgreSQL instance
+# that is already used by Flyte.
+#
+# IMPORTANT: Run this before deploying MLflow with PostgreSQL enabled.
+#
+# Prerequisites:
+# 1. PostgreSQL StatefulSet must be running (from projects/postgres/postgres.yaml)
+# 2. postgres-credentials Secret must exist in the postgres namespace
+#
+# Deploy:
+#   kubectl apply -f postgres-init-mlflow.yaml
+#
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-init-mlflow
+  namespace: postgres
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      nodeSelector:
+        role: system
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-pg
+          image: postgres:15-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres.postgres.svc.cluster.local -U flyte; do
+                echo "Waiting for postgres..."
+                sleep 2
+              done
+      containers:
+        - name: init-mlflow-db
+          image: postgres:15-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              HOST=postgres.postgres.svc.cluster.local
+
+              # Create mlflow user (pipe to stdin so psql -v substitution works)
+              echo "CREATE USER mlflow WITH PASSWORD :'mlflow_pass';" | \
+                psql -h "$HOST" -U flyte -d flyte -v mlflow_pass="$MLFLOW_PASSWORD" \
+                2>&1 || echo "User mlflow may already exist"
+
+              # Create mlflow database
+              psql -h "$HOST" -U flyte -d flyte \
+                -c "CREATE DATABASE mlflow OWNER mlflow;" \
+                2>&1 || echo "Database mlflow may already exist"
+
+              # Grant privileges (idempotent)
+              psql -h "$HOST" -U flyte -d flyte \
+                -c "GRANT ALL PRIVILEGES ON DATABASE mlflow TO mlflow;"
+
+              echo "MLflow database and user created successfully"
+          envFrom:
+            - secretRef:
+                name: mlflow-db-credentials

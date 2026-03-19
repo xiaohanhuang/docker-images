@@ -1,0 +1,6 @@
+name: model_evaluator
+version: "1.0.0"
+description: "Evaluate fine-tuned models on test data"
+category: evaluation
+image: ml-gpu
+tags: [evaluation, metrics]

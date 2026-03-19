@@ -91,7 +91,7 @@ def evaluate(checkpoint_s3_path: str) -> dict:
     ]
 
     outputs = sql_pipe(prompts, batch_size=16)
-    predictions = [o[0]["generated_text"].strip() for o in outputs]
+    predictions = [o["generated_text"].strip() for o in outputs]
     golds = test_df["answer"].tolist()
 
     # ── Exact match ───────────────────────────────────────────────────

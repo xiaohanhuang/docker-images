@@ -48,7 +48,7 @@ async def get_dashboard_overview() -> dict[str, Any]:
             "active_pods": len(active_pods),
             "gpu_pods": len(gpu_pods),
             "recent_jobs": jobs_data.get("jobs", []),
-            "total_cost": cost_data.get("total_cost", 0),
+            "total_cost": cost_data.total_cost,
             "pods": active_pods[:10],
         }
     except Exception as e:

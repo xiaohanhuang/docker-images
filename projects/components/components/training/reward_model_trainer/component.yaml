@@ -1,0 +1,6 @@
+name: reward_model_trainer
+version: "1.0.0"
+description: "Train a reward model from preference data for RLHF"
+category: training
+image: ml-gpu
+tags: [training, rlhf, reward-model]

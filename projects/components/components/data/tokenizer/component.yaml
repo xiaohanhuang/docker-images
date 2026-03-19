@@ -1,0 +1,6 @@
+name: tokenizer
+version: "1.0.0"
+description: "Tokenize text data with prompt templates"
+category: data
+image: ml-gpu
+tags: [data, tokenization, llm]

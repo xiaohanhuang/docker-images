@@ -33,7 +33,7 @@ def ingest_data() -> str:
     from datasets import load_dataset
 
     print(f"⬇️  Downloading dataset: {HF_DATASET}")
-    dataset = load_dataset(HF_DATASET, split="train", trust_remote_code=True)
+    dataset = load_dataset(HF_DATASET, split="train")
 
     print(f"✅ Loaded {len(dataset)} examples. Schema: {dataset.column_names}")
 
@@ -52,9 +52,7 @@ def ingest_data() -> str:
         parquet_bytes = shard_df.to_parquet(index=False)
         key = f"{prefix}/shard_{shard_count:04d}.parquet"
         s3.put_object(Bucket=bucket, Key=key, Body=parquet_bytes)
-        print(
-            f"  Uploaded shard {shard_count}: {len(shard_df)} rows → s3://{bucket}/{key}"
-        )
+        print(f"  Uploaded shard {shard_count}: {len(shard_df)} rows → s3://{bucket}/{key}")
         shard_count += 1
 
     print(f"✅ Ingestion complete: {shard_count} shards at {s3_path}")

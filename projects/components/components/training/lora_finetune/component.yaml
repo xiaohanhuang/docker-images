@@ -1,0 +1,6 @@
+name: lora_finetune
+version: "1.0.0"
+description: "LoRA/QLoRA fine-tuning for HuggingFace models"
+category: training
+image: ml-gpu
+tags: [training, lora, qlora, fine-tuning]

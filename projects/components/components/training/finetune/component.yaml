@@ -1,0 +1,6 @@
+name: finetune
+version: "1.0.0"
+description: "Fine-tune a causal LM with LoRA/QLoRA via PEFT"
+category: training
+image: ml-gpu
+tags: [training, fine-tuning, peft]

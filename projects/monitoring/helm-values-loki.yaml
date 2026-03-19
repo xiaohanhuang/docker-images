@@ -1,0 +1,49 @@
+grafana:
+  grafana.ini: {}
+  sidecar:
+    datasources:
+      enabled: true
+      isDefault: false
+      uid: loki
+loki:
+  config:
+    auth_enabled: false
+    limits_config:
+      max_entries_limit_per_query: 10000
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+    table_manager:
+      retention_deletes_enabled: true
+      retention_period: 168h
+  enabled: true
+  image:
+    tag: 2.9.3
+  nodeSelector:
+    role: system
+  persistence:
+    enabled: true
+    size: 20Gi
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+    snippets:
+      pipelineStages:
+        - cri: {}
+        - replace:
+            expression: (\x1b\[[0-9;]*[a-zA-Z]|\r)
+            replace: ""
+  tolerations:
+    - effect: NoSchedule
+      key: nvidia.com/gpu
+      operator: Exists
+    # Tolerate Karpenter disruption taint so Promtail keeps running
+    # during node drain, capturing final pod logs.
+    - key: karpenter.sh/disrupted
+      operator: Exists
+      effect: NoSchedule
+  # Start Promtail before workload pods on new Karpenter nodes so that
+  # short-lived Flyte task logs are captured even when the GPU node was
+  # just provisioned.
+  priorityClassName: system-node-critical
