@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
 import os
 import sys
-import json
 import hashlib
 import subprocess
 import argparse
@@ -16,10 +14,15 @@ def run_cmd(cmd, check=True, capture=False):
 
 def hash_files(files):
     h = hashlib.sha256()
+    missing = []
     for f in files:
         if os.path.exists(f):
             with open(f, 'rb') as fp:
                 h.update(fp.read())
+        else:
+            missing.append(f)
+    if missing:
+        raise FileNotFoundError(f"Expected file(s) not found for hashing: {', '.join(missing)}")
     return h.hexdigest()[:16]
 
 def main():
@@ -40,11 +43,12 @@ def main():
     full_repo = f"ml-platform/{args.repo}"
     
     # Check if this exact SHA already exists in ECR
+    region = os.environ.get("AWS_REGION", "us-west-2")
     check_cmd = [
         "aws", "ecr", "describe-images",
         "--repository-name", full_repo,
         "--image-ids", f"imageTag={sha_tag}",
-        "--region", "us-west-2",
+        "--region", region,
         "--output", "json"
     ]
     
@@ -57,7 +61,7 @@ def main():
             "aws", "ecr", "batch-get-image",
             "--repository-name", full_repo,
             "--image-ids", f"imageTag={sha_tag}",
-            "--region", "us-west-2",
+            "--region", region,
             "--query", "images[0].imageManifest",
             "--output", "text"
         ]
@@ -71,13 +75,13 @@ def main():
             
         for tag in tags_to_apply:
             print(f"Retagging existing image with {tag}...")
-            subprocess.run([
+            run_cmd([
                 "aws", "ecr", "put-image",
                 "--repository-name", full_repo,
                 "--image-manifest", manifest,
                 "--image-tag", tag,
-                "--region", "us-west-2"
-            ], capture_output=True)
+                "--region", region
+            ])
             
         return 0
 
@@ -91,7 +95,6 @@ def main():
         
     build_cmd = [
         "docker", "buildx", "build", "--push",
-        "--context", args.context,
         "--file", args.dockerfile,
         "--platform", "linux/amd64",
         "--cache-from", "type=gha",
@@ -103,6 +106,8 @@ def main():
         
     for ba in args.build_args:
         build_cmd.extend(["--build-arg", ba])
+        
+    build_cmd.append(args.context)
         
     run_cmd(build_cmd)
     
