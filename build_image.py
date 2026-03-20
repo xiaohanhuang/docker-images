@@ -41,7 +41,7 @@ def main():
     print(f"Calculated tag: {sha_tag}")
 
     full_repo = f"ml-platform/{args.repo}"
-    
+
     # Check if this exact SHA already exists in ECR
     region = os.environ.get("AWS_REGION", "us-west-2")
     check_cmd = [
@@ -51,11 +51,11 @@ def main():
         "--region", region,
         "--output", "json"
     ]
-    
+
     res = subprocess.run(check_cmd, capture_output=True, text=True)
     if res.returncode == 0:
         print(f"✅ Image {full_repo}:{sha_tag} already exists. Skipping build.")
-        
+
         # Get the manifest to retag it
         manifest_cmd = [
             "aws", "ecr", "batch-get-image",
@@ -66,13 +66,13 @@ def main():
             "--output", "text"
         ]
         manifest = run_cmd(manifest_cmd, capture=True)
-        
+
         tags_to_apply = []
         if args.branch == 'main':
             tags_to_apply.append('latest')
         else:
             tags_to_apply.append(f"branch-{args.branch}")
-            
+
         for tag in tags_to_apply:
             print(f"Retagging existing image with {tag}...")
             run_cmd([
@@ -82,17 +82,17 @@ def main():
                 "--image-tag", tag,
                 "--region", region
             ])
-            
+
         return 0
 
     print(f"🔨 Building {full_repo}...")
-    
+
     tags = [f"{args.registry}/{full_repo}:{sha_tag}"]
     if args.branch == 'main':
         tags.append(f"{args.registry}/{full_repo}:latest")
     else:
         tags.append(f"{args.registry}/{full_repo}:branch-{args.branch}")
-        
+
     build_cmd = [
         "docker", "buildx", "build", "--push",
         "--file", args.dockerfile,
@@ -100,16 +100,18 @@ def main():
         "--cache-from", "type=gha",
         "--cache-to", "type=gha,mode=max"
     ]
-    
+
     for t in tags:
         build_cmd.extend(["-t", t])
-        
+
     for ba in args.build_args:
         build_cmd.extend(["--build-arg", ba])
-        
+
     build_cmd.append(args.context)
-        
+
     run_cmd(build_cmd)
-    
+    return 0
+
+
 if __name__ == "__main__":
     sys.exit(main())
