@@ -2,3 +2,25 @@ __pycache__
 .terraform
 *.tfstate
 *.tfstate.backup
+
+# ── Synced source directories ──────────────────────────────────
+# These are copied from the main ml-platform repo at CI build time
+# via sync_source.sh. Do NOT commit these — they contain platform
+# source code that should only exist in the main repo.
+/cli/
+/backend/
+/pyproject.toml
+/projects/components/sdk/
+/projects/components/components/
+# Service source files are synced, but Dockerfiles/Makefiles stay
+/projects/components/services/execution-service/*.py
+/projects/components/services/registry-service/*.py
+/projects/components/services/registry-service/requirements.txt
+/projects/components/services/execution-service/requirements.txt
+
+# Virtual environments
+.venv/
+venv/
+
+# CI sync checkout directory
+_source/

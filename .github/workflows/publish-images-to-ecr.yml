@@ -6,9 +6,6 @@ on:
     paths:
       - images/**
       - "projects/**"
-      - "backend/**"
-      - "cli/**"
-      - "pyproject.toml"
       - ".github/workflows/publish-images-to-ecr.yml"
   workflow_dispatch:
     inputs:
@@ -25,6 +22,10 @@ on:
         description: Comma separated images to rebuild
         type: string
         default: ''
+      source_repo:
+        description: "GitHub repo for platform source (owner/repo)"
+        type: string
+        default: xiaohanhuang/ml-platform
 permissions:
   contents: read
 
@@ -37,6 +38,7 @@ env:
   # Update these to your AWS account / ECR registry.
   AWS_ROLE_ARN: arn:aws:iam::805673386114:role/github-actions-ecr-push-ml-platform-eks
   ECR_REGISTRY: 805673386114.dkr.ecr.us-west-2.amazonaws.com
+  SOURCE_REPO: ${{ inputs.source_repo || 'xiaohanhuang/ml-platform' }}
 
 jobs:
   detect:
@@ -179,6 +181,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Sync platform source code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          path: _source
+      - run: ./sync_source.sh _source
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -228,6 +237,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Sync platform source code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          path: _source
+      - run: ./sync_source.sh _source
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -261,6 +277,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Sync platform source code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          path: _source
+      - run: ./sync_source.sh _source
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
