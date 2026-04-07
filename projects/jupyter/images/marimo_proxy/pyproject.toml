@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "marimo-proxy"
+version = "0.1.0"
+description = "Jupyter Server Proxy entry for Marimo"
+
+[project.entry-points.jupyter_serverproxy_servers]
+marimo = "marimo_proxy:setup_marimo"

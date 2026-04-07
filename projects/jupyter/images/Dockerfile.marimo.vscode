@@ -1,0 +1,36 @@
+# Image that adds VS Code Server on top of the Marimo-enabled image
+FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo:7d81415fad9abc3dea9d0a12f5979d03cba1cdd3
+
+USER root
+
+# Install code-server (pinned version for reproducibility)
+RUN curl -fsSL https://code-server.dev/install.sh | sh -s -- --version 4.111.0
+
+USER ${NB_UID}
+
+# Install Continue AI coding extension (auto-complete & chat via Bedrock)
+RUN code-server --install-extension Continue.continue
+
+# Pre-configure Continue with AWS Bedrock (Claude 3.5 Sonnet)
+# Pods inherit IAM credentials via IRSA — no hardcoded keys needed.
+RUN mkdir -p /home/jovyan/.continue && \
+    cat > /home/jovyan/.continue/config.yaml << 'EOF'
+models:
+  - name: "Claude 3.5 Sonnet"
+    provider: bedrock
+    model: anthropic.claude-3-5-sonnet-20241022-v2:0
+    env:
+      region: us-west-2
+tabAutocompleteModel:
+  name: "Claude 3.5 Haiku"
+  provider: bedrock
+  model: anthropic.claude-3-5-haiku-20241022-v1:0
+  env:
+    region: us-west-2
+EOF
+
+# VS Code proxy entry (registers VS Code in JupyterLab launcher)
+COPY --chown=${NB_UID}:${NB_GID} projects/jupyter/images/vscode_proxy /opt/vscode-proxy/
+RUN pip install --no-cache-dir --no-deps /opt/vscode-proxy/
+
+EXPOSE 8888

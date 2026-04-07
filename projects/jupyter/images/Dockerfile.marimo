@@ -1,0 +1,30 @@
+# Marimo-enabled notebook image for the ML Platform
+# Bases on quay.io/jupyter/pytorch-notebook which already has:
+#   - CUDA runtime, cuDNN, PyTorch, JupyterLab
+# We add Marimo, Flyte/Ray/MLflow on top.
+FROM quay.io/jupyter/pytorch-notebook:python-3.12
+
+USER root
+
+# Install system deps needed by some Python packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    vim \
+    htop \
+    screen \
+    && rm -rf /var/lib/apt/lists/*
+
+USER ${NB_UID}
+
+# Install platform packages
+COPY projects/jupyter/images/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt torch-tb-profiler marimo jupyter-server-proxy
+
+# Marimo proxy entry (registers Marimo in JupyterLab launcher)
+COPY --chown=${NB_UID}:${NB_GID} projects/jupyter/images/marimo_proxy /opt/marimo-proxy/
+RUN pip install --no-cache-dir --no-deps /opt/marimo-proxy/
+
+# Platform SDK
+COPY --chown=${NB_UID}:${NB_GID} projects/components/sdk /opt/ml-platform-sdk/
+RUN pip install --no-cache-dir --no-deps -e /opt/ml-platform-sdk/
+
+EXPOSE 8888

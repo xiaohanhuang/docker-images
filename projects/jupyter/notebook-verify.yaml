@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-notebook-cpu
+  namespace: jupyter
+  labels:
+    app: test-notebook
+spec:
+  nodeSelector:
+    role: cpu-worker
+  containers:
+    - name: notebook
+      image: quay.io/jupyter/scipy-notebook:python-3.11
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+      command: ["sh", "-c", "echo 'CPU Notebook Started' && sleep 3600"]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-notebook-gpu
+  namespace: jupyter
+  labels:
+    app: test-notebook
+spec:
+  nodeSelector:
+    node.kubernetes.io/instance-type: g5.xlarge
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  containers:
+    - name: notebook
+      image: pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+      command:
+        [
+          "sh",
+          "-c",
+          'python -c ''import torch; print(f"GPU available: {torch.cuda.is_available()}"); print(f"GPU count: {torch.cuda.device_count()}")'' && sleep 3600',
+        ]

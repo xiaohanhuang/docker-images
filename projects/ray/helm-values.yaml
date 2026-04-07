@@ -1,0 +1,25 @@
+# KubeRay Operator Helm Values
+# Chart: kuberay-operator from https://ray-project.github.io/kuberay-helm
+# Version: 1.0.0
+
+# Operator settings
+operator:
+  image:
+    repository: kuberay/operator
+    tag: v1.0.0
+
+# Default RayCluster template (used by Flyte Ray plugin)
+# Individual jobs can override these values
+batchScheduler:
+  enabled: false
+
+nodeSelector:
+  role: system
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
