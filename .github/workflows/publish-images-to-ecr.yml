@@ -46,6 +46,10 @@ jobs:
       notebook_marimo_vscode: ${{ steps.changes.outputs.notebook_marimo_vscode }}
       gpu_idle_monitor: ${{ steps.changes.outputs.gpu_idle_monitor }}
       spark_base: ${{ steps.changes.outputs.spark_base }}
+            execution_service:
+              - 'projects/components/services/execution-service/**'
+
+      execution_service: ${{ steps.changes.outputs.execution_service }}
 
     steps:
       - uses: actions/checkout@v4
@@ -106,6 +110,9 @@ jobs:
             gpu_idle_monitor:
               - 'projects/jupyter/gpu-idle-monitor/**'
             spark_base:
+            execution_service:
+              - 'projects/components/services/execution-service/**'
+
               - 'projects/spark/images/**'
 
   skip:
@@ -369,5 +376,19 @@ jobs:
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/spark-base:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/spark-base:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push execution-service
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.execution_service == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: projects/components/services/execution-service
+          file: projects/components/services/execution-service/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/execution-service:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/execution-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
