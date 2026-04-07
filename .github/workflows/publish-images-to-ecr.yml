@@ -46,9 +46,6 @@ jobs:
       notebook_marimo_vscode: ${{ steps.changes.outputs.notebook_marimo_vscode }}
       gpu_idle_monitor: ${{ steps.changes.outputs.gpu_idle_monitor }}
       spark_base: ${{ steps.changes.outputs.spark_base }}
-            execution_service:
-              - 'projects/components/services/execution-service/**'
-
       execution_service: ${{ steps.changes.outputs.execution_service }}
 
     steps:
@@ -110,10 +107,9 @@ jobs:
             gpu_idle_monitor:
               - 'projects/jupyter/gpu-idle-monitor/**'
             spark_base:
+              - 'projects/spark/images/**'
             execution_service:
               - 'projects/components/services/execution-service/**'
-
-              - 'projects/spark/images/**'
 
   skip:
     runs-on: ubuntu-latest
