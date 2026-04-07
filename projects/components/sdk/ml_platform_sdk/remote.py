@@ -212,9 +212,10 @@ def _execute_remote(
             try:
                 text = chunk.decode("utf-8")
                 # Strip trailing spaces added server-side to flush uvicorn's buffer.
-                # Without this, the padding wraps across terminal columns and
-                # the \r spinner leaves stale lines on screen.
+                # Strip trailing spaces added server-side to flush uvicorn's buffer.
+                # Remove large blocks of spaces from the middle of the chunk if it was segmented.
                 text = text.rstrip(" ")
+                text = text.replace(" " * 100, "")
             except UnicodeDecodeError:
                 # Binary result data
                 result_data += chunk
