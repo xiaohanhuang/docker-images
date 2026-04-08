@@ -24,6 +24,10 @@ RUN pip install --no-cache-dir \
     "protobuf==6.33.5" \
     "requests==2.32.4"
 
+# Install the ML Platform SDK
+COPY projects/components/sdk /tmp/ml-platform-sdk
+RUN pip install --no-cache-dir /tmp/ml-platform-sdk && rm -rf /tmp/ml-platform-sdk
+
 # Copy workflow source (tasks + config)
 COPY config.py      /app/config.py
 COPY tasks/         /app/tasks/

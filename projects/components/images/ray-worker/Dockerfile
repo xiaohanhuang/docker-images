@@ -32,7 +32,12 @@ RUN pip install --no-cache-dir \
     requests \
     boto3 \
     s3fs \
-    torch-tb-profiler
+    torch-tb-profiler \
+    flytekit
+
+# Install the ML Platform SDK so tasks can use `import ml_platform_sdk as mp`
+COPY projects/components/sdk /tmp/ml-platform-sdk
+RUN pip install --no-cache-dir /tmp/ml-platform-sdk && rm -rf /tmp/ml-platform-sdk
 
 EXPOSE 6379 8265 10001 8000
 

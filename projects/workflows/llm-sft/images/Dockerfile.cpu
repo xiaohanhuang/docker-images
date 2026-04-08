@@ -20,6 +20,10 @@ RUN pip install --no-cache-dir \
     numpy==1.26.0 \
     scikit-learn==1.5.0
 
+# Install the ML Platform SDK
+COPY projects/components/sdk /tmp/ml-platform-sdk
+RUN pip install --no-cache-dir /tmp/ml-platform-sdk && rm -rf /tmp/ml-platform-sdk
+
 # Copy shared component library (prepared by `make prepare`)
 COPY components/ /app/components/
 
