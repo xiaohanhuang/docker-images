@@ -23,6 +23,16 @@ import functools
 import os
 from typing import Any, Callable, Dict, Optional
 
+from ml_platform_sdk.gpu_types import VALID_GPU_TYPES
+
+# Auto-load .env from project root (walks up from cwd)
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
 try:
     import cloudpickle
 except ImportError:
@@ -98,6 +108,10 @@ def remote(
     def decorator(fn: Callable) -> Callable:
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
+            if gpu_type not in VALID_GPU_TYPES:
+                raise ValueError(
+                    f"Invalid gpu_type={gpu_type!r}. " f"Valid options: {sorted(VALID_GPU_TYPES)}"
+                )
             return _execute_remote(
                 fn=fn,
                 args=args,
