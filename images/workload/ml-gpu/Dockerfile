@@ -44,8 +44,8 @@ RUN pip install --no-cache-dir \
     rouge-score==${ROUGE_VERSION} \
     sentencepiece==${SENTENCEPIECE_VERSION}
 
-# Install ML Platform SDK from the private source image
-COPY --from=source /src/projects/components/sdk /tmp/sdk
-RUN pip install --no-cache-dir /tmp/sdk && rm -rf /tmp/sdk
+# Install ML Platform SDK dynamically without leaving source layer bloat
+RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk \
+    pip install --no-cache-dir /tmp/sdk
 
 WORKDIR /root
