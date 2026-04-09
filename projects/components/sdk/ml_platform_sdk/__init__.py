@@ -10,7 +10,7 @@ from typing import Callable, Dict
 os.environ["FLYTE_SDK_LOGGING_LEVEL"] = "40"
 
 import flytekit
-from flytekit import Resources, dynamic, eager, map_task
+from flytekit import Resources, dynamic, eager, map_task, task
 from flytekit.types.directory import FlyteDirectory  # noqa: F401
 from flytekit.types.file import FlyteFile  # noqa: F401
 
@@ -219,6 +219,7 @@ def submit(
 __all__ = [
     # Flytekit re-exports
     "Resources",
+    "task",
     "dynamic",
     "eager",
     "map_task",
