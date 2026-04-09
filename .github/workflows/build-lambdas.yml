@@ -30,8 +30,14 @@ jobs:
           mkdir -p ../../packages/ecr-image-action-event-filtering
           zip -r ../../packages/ecr-image-action-event-filtering/lambda.zip .
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: lambda-packages
-          path: cfn-ecr-aws-soci-index-builder/functions/packages/
+      - name: Create Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Generate a random release tag
+          TAG="v1.0.${{ github.run_number }}"
+          gh release create "$TAG" \
+            cfn-ecr-aws-soci-index-builder/functions/packages/soci-index-generator-lambda/soci_index_generator_lambda.zip \
+            cfn-ecr-aws-soci-index-builder/functions/packages/ecr-image-action-event-filtering/lambda.zip \
+            --title "SOCI Lambda Packages $TAG" \
+            --notes "Automated release of SOCI lambda packages"
