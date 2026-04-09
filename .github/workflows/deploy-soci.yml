@@ -1,0 +1,48 @@
+name: Deploy SOCI Index Builder
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Checkout AWS SOCI Index Builder
+        run: |
+          git clone https://github.com/awslabs/cfn-ecr-aws-soci-index-builder.git
+          cd cfn-ecr-aws-soci-index-builder
+          
+          # Setup taskcat config
+          cat > .taskcat.yml << 'EOF'
+          project:
+            name: cfn-ecr-aws-soci-index-builder
+            owner: quickstart@amazon.com
+            s3_regional_buckets: true
+            lambda_source_path: functions/source
+            lambda_zip_path: functions/packages
+            parameters:
+              QSS3BucketName: $[taskcat_autobucket]
+              QSS3KeyPrefix: "cfn-ecr-aws-soci-index-builder/"
+          tests:
+            can-deploy:
+              stack_name: "soci-index-builder"
+              parameters:
+                SociRepositoryImageTagFilters: "ml-platform/*:*"
+                SociIndexVersion: "V2"
+              regions:
+                - us-west-2
+              template: templates/SociIndexBuilder.yml
+          EOF
+
+      - name: Install taskcat and deploy
+        run: |
+          pip install taskcat
+          cd cfn-ecr-aws-soci-index-builder
+          taskcat test run -n
