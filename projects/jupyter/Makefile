@@ -28,14 +28,14 @@ uninstall:
 	helm uninstall $(RELEASE_NAME) --namespace $(NAMESPACE)
 
 build-images:
-	docker build -t ml-platform/notebook:latest -f images/Dockerfile ../../
-	docker build -t ml-platform/notebook-gpu:latest -f images/Dockerfile.gpu ../../
+	docker build -t ml-platform/notebook:1.0.0 -f images/Dockerfile ../../
+	docker build -t ml-platform/notebook-gpu:1.0.0 -f images/Dockerfile.gpu ../../
 
 build-vscode:
-	docker build -t ml-platform/notebook-marimo-vscode:latest -f images/Dockerfile.marimo.vscode ../../
+	docker build -t ml-platform/notebook-marimo-vscode:1.0.0 -f images/Dockerfile.marimo.vscode ../../
 
 build-monitor:
-	docker build -t ml-platform/gpu-idle-monitor:latest gpu-idle-monitor/
+	docker build -t ml-platform/gpu-idle-monitor:1.0.0 gpu-idle-monitor/
 
 status:
 	kubectl get pods -n $(NAMESPACE)

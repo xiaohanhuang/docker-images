@@ -38,6 +38,8 @@ from ml_platform_sdk.tasks.gpu import (
     GPU_TAINT_EFFECT,
     GPU_TAINT_KEY,
     GPU_TAINT_VALUE,
+    GPU_TYPE_SELECTORS,
+    INSTANCE_FAMILY_LABEL,
 )
 
 # ---------------------------------------------------------------------------
@@ -298,6 +300,7 @@ def accelerate_task(
     strategy: str = "auto",
     num_nodes: int = 1,
     gpus_per_node: int = 1,
+    gpu_type: str = "any",
     cpu: str = "4",
     mem: str = "16Gi",
     **task_kwargs,
@@ -311,6 +314,7 @@ def accelerate_task(
         strategy: ``"auto"``, ``"ddp"``, ``"fsdp"``, or ``"deepspeed"``.
         num_nodes: Number of training nodes.
         gpus_per_node: GPUs per node.
+        gpu_type: GPU family to target (``"any"``, ``"a10g"``, ``"a100"``).
         cpu: CPU request per node.
         mem: Memory request per node.
         **task_kwargs: Extra keyword arguments forwarded to ``flytekit.task``.
@@ -357,10 +361,14 @@ def accelerate_task(
 
     res = Resources(cpu=cpu, mem=mem, gpu=str(gpus_per_node))
 
+    node_selector = {GPU_NODE_LABEL: GPU_NODE_LABEL_VALUE}
+    if gpu_type != "any" and gpu_type in GPU_TYPE_SELECTORS:
+        node_selector[INSTANCE_FAMILY_LABEL] = GPU_TYPE_SELECTORS[gpu_type]
+
     pod_template = PodTemplate(
         pod_spec=V1PodSpec(
             containers=[V1Container(name="primary")],
-            node_selector={GPU_NODE_LABEL: GPU_NODE_LABEL_VALUE},
+            node_selector=node_selector,
             tolerations=[
                 V1Toleration(
                     key=GPU_TAINT_KEY,

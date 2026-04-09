@@ -8,8 +8,6 @@
 #   • rouge-score                      — offline metrics
 #   • sentencepiece                    — tokenizer dependency
 #
-# ml_platform_sdk is inherited from flyte-gpu.
-#
 # Used by: components/training/*, components/evaluation/*
 #
 # Pre-pull tag example:  ml-gpu:1.0.0

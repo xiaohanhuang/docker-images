@@ -5,7 +5,6 @@
 #   • flytekit — Flyte SDK / task execution engine
 #   • boto3 + s3fs — S3 access (needed by nearly every task)
 #   • requests — common HTTP utility
-#   • ml_platform_sdk — platform SDK (gpu_task, accelerate_task, etc.)
 #
 # All data-processing and CPU-only Flyte tasks should build
 # FROM this image, not from python:3.12-slim directly.
@@ -13,8 +12,6 @@
 # Pre-pull tag example:  flyte-cpu:fly1.14-1.0.0
 # Parent: base-cpu       Child images: data-cpu
 # ============================================================
-
-FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/source:latest AS source
 
 ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
 ARG REPO=ml-platform
@@ -31,9 +28,5 @@ RUN pip install --no-cache-dir \
     boto3==${BOTO3_VERSION} \
     s3fs==${S3FS_VERSION} \
     requests==${REQUESTS_VERSION}
-
-# Install ML Platform SDK from the private source image
-COPY --from=source /src/projects/components/sdk /tmp/sdk
-RUN pip install --no-cache-dir /tmp/sdk && rm -rf /tmp/sdk
 
 WORKDIR /root

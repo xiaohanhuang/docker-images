@@ -147,7 +147,7 @@ def submit(
 
     # Get default image from config or use a sensible fallback
     default_image = cfg.get(
-        "default_image", "805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/base-cpu:latest"
+        "default_image", "805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/base-cpu:1.1.0"
     )
 
     from flytekit.configuration import Image, ImageConfig
@@ -156,7 +156,7 @@ def submit(
     if ":" in default_image:
         fqn, tag = default_image.rsplit(":", 1)
     else:
-        fqn, tag = default_image, "latest"
+        fqn, tag = default_image, "1.1.0"
 
     img = Image(name="default", fqn=fqn, tag=tag)
     ImageConfig(default_image=img)
