@@ -6,7 +6,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
       - name: Checkout AWS SOCI Index Builder
         run: |
           git clone https://github.com/awslabs/cfn-ecr-aws-soci-index-builder.git
