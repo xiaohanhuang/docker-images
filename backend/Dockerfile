@@ -14,6 +14,7 @@ COPY --from=source /src/pyproject.toml /src/README.md /app/
 COPY --from=source /src/backend/ /app/backend/
 COPY --from=source /src/cli/ /app/cli/
 COPY --from=source /src/projects/components/sdk/ml_platform_sdk/ /app/projects/components/sdk/ml_platform_sdk/
+COPY --from=source /src/projects/components/components/ /app/projects/components/components/
 COPY --from=source /src/projects/recipes/ /app/projects/recipes/
 
 # Install backend dependencies using uv

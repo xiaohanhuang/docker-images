@@ -14,6 +14,7 @@ projects/components/images/training-llm
 projects/components/images/executor-pool
 projects/components/images/executor-pool-cpu
 projects/components/sdk
+projects/components/components
 projects/components/services/execution-service
 projects/components/services/registry-service
 projects/backend
