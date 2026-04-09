@@ -31,7 +31,7 @@ RUN pip install --no-cache-dir "setuptools<70" wheel && \
     boto3 \
     s3fs \
     torch-tb-profiler \
-    flytekit
+    flytekit==1.16.14
 
 # Install the ML Platform SDK so tasks can use `import ml_platform_sdk as mp`
 COPY projects/components/sdk /tmp/ml-platform-sdk
