@@ -1,4 +1,4 @@
-FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/base-gpu-torch:latest
+FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/base-gpu:latest
 
 # Install Flask for HTTP server
 RUN pip install --no-cache-dir flask==3.1.1

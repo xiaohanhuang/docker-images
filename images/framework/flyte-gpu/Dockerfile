@@ -18,8 +18,8 @@ FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/source:latest AS s
 
 ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
 ARG REPO=ml-platform
-ARG BASE_TAG=cu12.9-torch2.10-1.1.0
-FROM ${REGISTRY}/${REPO}/base-gpu-torch:${BASE_TAG}
+ARG BASE_TAG=latest
+FROM ${REGISTRY}/${REPO}/base-gpu:${BASE_TAG}
 
 ARG FLYTEKIT_VERSION=1.16.14
 ARG BOTO3_VERSION=1.42.61
