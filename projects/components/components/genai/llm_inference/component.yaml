@@ -1,0 +1,6 @@
+name: llm_inference
+version: "1.0.0"
+description: "Configurable LLM inference with multi-backend support"
+category: genai
+image: genai-gpu
+tags: [genai, inference, llm]

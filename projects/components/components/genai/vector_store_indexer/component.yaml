@@ -1,0 +1,6 @@
+name: vector_store_indexer
+version: "1.0.0"
+description: "Index embeddings into a vector database"
+category: genai
+image: genai-gpu
+tags: [genai, vector-store, pgvector, faiss]

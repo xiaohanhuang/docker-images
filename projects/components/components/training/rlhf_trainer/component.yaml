@@ -1,0 +1,6 @@
+name: rlhf_trainer
+version: "1.0.0"
+description: "RL alignment via PPO / REINFORCE++ / GRPO / RLOO"
+category: training
+image: ml-gpu
+tags: [training, rlhf, ppo, alignment]

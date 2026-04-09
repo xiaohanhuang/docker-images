@@ -1,0 +1,6 @@
+name: distributed_rlhf_trainer
+version: "1.0.2"
+description: "Distributed multi-role RLHF training using OpenRLHF"
+category: training
+image: training-llm
+tags: [training, rlhf, distributed, openrlhf]

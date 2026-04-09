@@ -1,0 +1,6 @@
+name: preference_data_generator
+version: "1.0.0"
+description: "AI-powered preference pair creation for DPO/RLHF"
+category: data
+image: genai-gpu
+tags: [data, rlhf, preferences, dpo]

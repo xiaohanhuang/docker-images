@@ -1,0 +1,6 @@
+name: full_finetune
+version: "1.0.0"
+description: "Full-parameter fine-tuning with optional FSDP"
+category: training
+image: ml-gpu
+tags: [training, fine-tuning, fsdp]

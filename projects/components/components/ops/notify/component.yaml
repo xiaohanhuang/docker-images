@@ -1,0 +1,6 @@
+name: notify
+version: "1.0.0"
+description: "Send a Microsoft Teams notification"
+category: ops
+image: data-cpu
+tags: [ops, notification, teams]

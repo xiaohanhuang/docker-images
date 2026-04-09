@@ -1,0 +1,6 @@
+name: eval_lm
+version: "1.0.0"
+description: "Evaluate a language model checkpoint on a test dataset"
+category: evaluation
+image: ml-gpu
+tags: [evaluation, llm, metrics]

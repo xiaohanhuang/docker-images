@@ -1,0 +1,6 @@
+name: reward_bench
+version: "1.0.0"
+description: "Benchmark reward models against RewardBench suite"
+category: evaluation
+image: ml-gpu
+tags: [evaluation, reward-model, benchmark]

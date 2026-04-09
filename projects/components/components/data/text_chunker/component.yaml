@@ -1,0 +1,6 @@
+name: text_chunker
+version: "1.0.0"
+description: "Split documents into overlapping chunks for RAG indexing"
+category: data
+image: data-cpu
+tags: [data, rag, chunking]
