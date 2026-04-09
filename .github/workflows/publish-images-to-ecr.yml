@@ -176,6 +176,10 @@ jobs:
           platforms: linux/amd64
           push: true
           provenance: false
+          build-args: |
+            REGISTRY=${{ env.ECR_REGISTRY }}
+            REPO=ml-platform
+            BASE_TAG=latest
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/flyte-gpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/flyte-gpu:${{ github.sha }}
@@ -304,6 +308,10 @@ jobs:
           platforms: linux/amd64
           push: true
           provenance: false
+          build-args: |
+            REGISTRY=${{ env.ECR_REGISTRY }}
+            REPO=ml-platform
+            BASE_TAG=latest
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/flyte-cpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/flyte-cpu:${{ github.sha }}

@@ -18,7 +18,7 @@ FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/source:latest AS s
 
 ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
 ARG REPO=ml-platform
-ARG BASE_TAG=py3.12-1.1.0
+ARG BASE_TAG=latest
 FROM ${REGISTRY}/${REPO}/base-cpu:${BASE_TAG}
 
 ARG FLYTEKIT_VERSION=1.16.14
