@@ -7,12 +7,15 @@
 #   • mlflow                           — experiment tracking
 #   • rouge-score                      — offline metrics
 #   • sentencepiece                    — tokenizer dependency
+#   • ml_platform_sdk                  — platform SDK
 #
 # Used by: components/training/*, components/evaluation/*
 #
 # Pre-pull tag example:  ml-gpu:1.0.0
 # Parent: flyte-gpu
 # ============================================================
+
+FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/source:latest AS source
 
 ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
 ARG REPO=ml-platform
@@ -39,5 +42,9 @@ RUN pip install --no-cache-dir \
     mlflow==${MLFLOW_VERSION} \
     rouge-score==${ROUGE_VERSION} \
     sentencepiece==${SENTENCEPIECE_VERSION}
+
+# Install ML Platform SDK from the private source image
+COPY --from=source /src/projects/components/sdk /tmp/sdk
+RUN pip install --no-cache-dir /tmp/sdk && rm -rf /tmp/sdk
 
 WORKDIR /root
