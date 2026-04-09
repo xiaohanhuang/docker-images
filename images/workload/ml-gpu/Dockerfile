@@ -7,7 +7,6 @@
 #   • mlflow                           — experiment tracking
 #   • rouge-score                      — offline metrics
 #   • sentencepiece                    — tokenizer dependency
-#   • ml_platform_sdk                  — platform SDK
 #
 # Used by: components/training/*, components/evaluation/*
 #
@@ -18,9 +17,6 @@
 ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
 ARG REPO=ml-platform
 ARG BASE_TAG=fly1.16.14-cu12.9.1-1.1.0
-
-FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/source:latest AS source
-
 FROM ${REGISTRY}/${REPO}/flyte-gpu:${BASE_TAG}
 
 # Remove distutils-installed blinker 1.4 (Ubuntu system pkg) that blocks pip uninstall
@@ -43,9 +39,5 @@ RUN pip install --no-cache-dir \
     mlflow==${MLFLOW_VERSION} \
     rouge-score==${ROUGE_VERSION} \
     sentencepiece==${SENTENCEPIECE_VERSION}
-
-# Install ML Platform SDK dynamically without leaving source layer bloat
-RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk \
-    pip install --no-cache-dir /tmp/sdk
 
 WORKDIR /root
