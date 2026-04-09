@@ -16,10 +16,8 @@
 # Parent: base-gpu-torch    Child images: training-llm
 # ============================================================
 
-ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
-ARG REPO=ml-platform
-ARG BASE_TAG=cu12.9-torch2.10-1.1.0
-FROM ${REGISTRY}/${REPO}/base-gpu-torch:${BASE_TAG}
+ARG BASE_IMAGE=805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/base-gpu:latest
+FROM ${BASE_IMAGE}
 
 ARG RAY_VERSION=2.54.0
 
