@@ -71,6 +71,30 @@ def _resolve_component(full_name: str, registry: dict[str, dict[str, Any]]) -> d
     return registry.get(parts[-1], {})
 
 
+async def _get_flyte_version(kind: str, full_name: str) -> str:
+    """Fetch the latest version of a Flyte task or workflow.
+
+    ``kind`` is ``"tasks"`` or ``"workflows"``.
+    Returns the git-sha version string, or ``"unknown"`` on failure.
+    """
+    try:
+        data = await svc_get(
+            "flyte_http",
+            f"api/v1/{kind}/ml-platform/development/{full_name}",
+            params={
+                "limit": 1,
+                "sort_by.key": "created_at",
+                "sort_by.direction": "DESCENDING",
+            },
+        )
+        items = data.get(kind, [])
+        if items:
+            return items[0]["id"]["version"]
+    except Exception:
+        pass
+    return "unknown"
+
+
 @router.get("")
 async def list_components() -> dict[str, Any]:
     """List components from Flyte, enriched with component.yaml metadata."""
@@ -90,10 +114,11 @@ async def list_components() -> dict[str, Any]:
                 full_name = entity.get("name", "")
                 meta = _resolve_component(full_name, yaml_registry)
                 func_name = full_name.split(".")[-1]
+                version = meta.get("version") or await _get_flyte_version("tasks", full_name)
                 components.append(
                     {
                         "name": meta.get("name") or func_name,
-                        "version": meta.get("version", "latest"),
+                        "version": version,
                         "desc": meta.get("desc") or full_name,
                         "type": "task",
                         "category": meta.get("category", ""),
@@ -114,10 +139,11 @@ async def list_components() -> dict[str, Any]:
                 full_name = entity.get("name", "")
                 meta = _resolve_component(full_name, yaml_registry)
                 func_name = full_name.split(".")[-1]
+                version = meta.get("version") or await _get_flyte_version("workflows", full_name)
                 components.append(
                     {
                         "name": meta.get("name") or func_name,
-                        "version": meta.get("version", "latest"),
+                        "version": version,
                         "desc": meta.get("desc") or full_name,
                         "type": "workflow",
                         "category": meta.get("category", ""),
@@ -208,20 +234,155 @@ async def list_components() -> dict[str, Any]:
     }
 
 
+def _format_flyte_type(type_obj: dict[str, Any]) -> str:
+    """Convert a Flyte LiteralType JSON object to a readable Python type string."""
+    if "simple" in type_obj:
+        simple_map = {
+            "INTEGER": "int",
+            "FLOAT": "float",
+            "STRING": "str",
+            "BOOLEAN": "bool",
+            "DATETIME": "datetime",
+            "DURATION": "timedelta",
+            "BINARY": "bytes",
+            "NONE": "None",
+        }
+        return simple_map.get(type_obj["simple"], type_obj["simple"])
+    if "collection_type" in type_obj:
+        inner = _format_flyte_type(type_obj["collection_type"])
+        return f"List[{inner}]"
+    if "map_value_type" in type_obj:
+        inner = _format_flyte_type(type_obj["map_value_type"])
+        return f"Dict[str, {inner}]"
+    if "blob" in type_obj:
+        dim = type_obj["blob"].get("dimensionality", "")
+        return "FlyteDirectory" if dim == "MULTIPART" else "FlyteFile"
+    if "union_type" in type_obj:
+        union_variants = type_obj["union_type"].get("variants", [])
+        variants = [_format_flyte_type(v["type"]) for v in union_variants]
+        nones = [v for v in variants if v == "None"]
+        others = [v for v in variants if v != "None"]
+        if nones and len(others) == 1:
+            return f"Optional[{others[0]}]"
+        return " | ".join(variants) if variants else "Any"
+    if "structured_dataset_type" in type_obj:
+        return "StructuredDataset"
+    return "Any"
+
+
+async def _fetch_flyte_task_detail(flyte_name: str) -> dict[str, Any] | None:
+    """Fetch the latest version of a Flyte task with full interface details."""
+    try:
+        data = await svc_get(
+            "flyte_http",
+            f"api/v1/tasks/ml-platform/development/{flyte_name}",
+            params={
+                "limit": 1,
+                "sort_by.key": "created_at",
+                "sort_by.direction": "DESCENDING",
+            },
+        )
+        tasks = data.get("tasks", [])
+        if not tasks:
+            return None
+        task = tasks[0]
+        tmpl = task["closure"]["compiled_task"]["template"]
+        task_id = task["id"]
+
+        # Extract interface
+        iface = tmpl.get("interface", {})
+        inputs = []
+        for pname, pval in iface.get("inputs", {}).get("variables", {}).items():
+            inputs.append({"name": pname, "type": _format_flyte_type(pval.get("type", {}))})
+        outputs = []
+        for pname, pval in iface.get("outputs", {}).get("variables", {}).items():
+            outputs.append({"name": pname, "type": _format_flyte_type(pval.get("type", {}))})
+
+        # Extract image from container or k8s_pod
+        image = ""
+        container = tmpl.get("container", {})
+        if container.get("image"):
+            image = container["image"]
+        elif tmpl.get("k8s_pod"):
+            for c in tmpl["k8s_pod"].get("pod_spec", {}).get("containers", []):
+                if c.get("image"):
+                    image = c["image"]
+                    break
+
+        return {
+            "version": task_id.get("version", ""),
+            "task_type": tmpl.get("type", ""),
+            "image": image,
+            "inputs": inputs,
+            "outputs": outputs,
+        }
+    except Exception as e:
+        logger.warning(f"Could not fetch Flyte task detail for {flyte_name}: {e}")
+        return None
+
+
 @router.get("/{name}")
 async def get_component(name: str) -> dict[str, Any]:
-    """Return detailed metadata for a single component."""
+    """Return detailed metadata for a single component.
+
+    Merges component.yaml metadata with live Flyte task details (inputs,
+    outputs, container image, version).
+    """
     yaml_registry = _load_component_registry()
     meta = yaml_registry.get(name)
-    if not meta:
+
+    # Find the Flyte entity name(s) to query
+    flyte_detail: dict[str, Any] | None = None
+    # Try common Flyte path patterns for this component
+    if meta:
+        category = meta.get("category", "")
+        candidates = [
+            f"components.{category}.{name}.task.{name}",
+        ]
+        # Also scan task_ids for a match
+        try:
+            tasks_data = await svc_get(
+                "flyte_http",
+                "api/v1/task_ids/ml-platform/development",
+                params={"limit": 100},
+            )
+            for entity in tasks_data.get("entities", []):
+                full_name = entity.get("name", "")
+                parts = full_name.split(".")
+                if len(parts) >= 4 and parts[0] == "components" and parts[2] == name:
+                    if full_name not in candidates:
+                        candidates.insert(0, full_name)
+        except Exception:
+            pass
+
+        for candidate in candidates:
+            flyte_detail = await _fetch_flyte_task_detail(candidate)
+            if flyte_detail:
+                break
+
+    if not meta and not flyte_detail:
         raise HTTPException(status_code=404, detail=f"Component '{name}' not found")
 
-    return {
-        "name": meta["name"],
-        "version": meta["version"],
-        "desc": meta["desc"],
-        "category": meta["category"],
-        "tags": meta["tags"],
-        "image": meta["image"],
-        "image_tag": meta["image_tag"],
+    result: dict[str, Any] = {
+        "name": meta["name"] if meta else name,
+        "version": (meta or {}).get("version", ""),
+        "desc": (meta or {}).get("desc", ""),
+        "category": (meta or {}).get("category", ""),
+        "tags": (meta or {}).get("tags", []),
+        "image": "",
+        "image_tag": (meta or {}).get("image_tag", ""),
+        "inputs": [],
+        "outputs": [],
+        "task_type": "",
     }
+
+    if flyte_detail:
+        result["version"] = flyte_detail["version"] or result["version"]
+        result["image"] = flyte_detail["image"]
+        result["inputs"] = flyte_detail["inputs"]
+        result["outputs"] = flyte_detail["outputs"]
+        result["task_type"] = flyte_detail["task_type"]
+    elif meta:
+        result["image"] = f"{meta.get('image', '')}:{meta.get('image_tag', '')}"
+
+    return result
