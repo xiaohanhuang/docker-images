@@ -22,6 +22,9 @@ FROM ${REGISTRY}/${REPO}/source:latest AS source
 
 FROM ${REGISTRY}/${REPO}/base-gpu:${BASE_TAG}
 
+# Remove distutils-installed blinker 1.4 (Ubuntu system pkg) that blocks pip uninstall
+RUN rm -rf /usr/lib/python3/dist-packages/blinker* || true
+
 ARG FLYTEKIT_VERSION=1.16.14
 ARG BOTO3_VERSION=1.42.61
 ARG S3FS_VERSION=2026.2.0
