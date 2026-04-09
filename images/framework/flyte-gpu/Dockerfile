@@ -21,7 +21,8 @@ ARG BOTO3_VERSION=1.42.61
 ARG S3FS_VERSION=2026.2.0
 ARG REQUESTS_VERSION=2.32.5
 
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir setuptools wheel && \
+    pip install --no-cache-dir \
     flytekit==${FLYTEKIT_VERSION} \
     boto3==${BOTO3_VERSION} \
     s3fs==${S3FS_VERSION} \

@@ -21,7 +21,8 @@ FROM ${BASE_IMAGE}
 
 ARG RAY_VERSION=2.54.0
 
-RUN pip install --no-cache-dir \
+RUN pip install --no-cache-dir setuptools wheel && \
+    pip install --no-cache-dir \
     "ray[default]==${RAY_VERSION}" \
     pandas \
     numpy \
