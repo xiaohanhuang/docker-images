@@ -4,6 +4,8 @@ on:
   push:
     branches: ["main"]
     paths:
+      - "backend/**"
+      - "dashboard/**"
       - "projects/**"
       - "images/**"
       - ".github/workflows/publish-images-to-ecr.yml"
@@ -49,6 +51,8 @@ jobs:
       gpu_idle_monitor: ${{ steps.changes.outputs.gpu_idle_monitor }}
       spark_base: ${{ steps.changes.outputs.spark_base }}
       execution_service: ${{ steps.changes.outputs.execution_service }}
+      backend_api: ${{ steps.changes.outputs.backend_api }}
+      dashboard: ${{ steps.changes.outputs.dashboard }}
 
     steps:
       - uses: actions/checkout@v4
@@ -118,6 +122,10 @@ jobs:
               - 'projects/spark/images/**'
             execution_service:
               - 'projects/components/services/execution-service/**'
+            backend_api:
+              - 'backend/**'
+            dashboard:
+              - 'dashboard/**'
 
   skip:
     runs-on: ubuntu-latest
@@ -462,6 +470,7 @@ jobs:
   build-proprietary-services:
     runs-on: ubuntu-latest
     needs: detect
+    if: needs.detect.outputs.mode == 'force' || (needs.detect.outputs.mode == 'auto' && (needs.detect.outputs.backend_api == 'true' || needs.detect.outputs.dashboard == 'true'))
 
     permissions:
       id-token: write
@@ -483,6 +492,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push dashboard
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.dashboard == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -495,6 +505,7 @@ jobs:
             ${{ env.ECR_REGISTRY }}/ml-platform/dashboard:${{ github.sha }}
 
       - name: Build and push backend-api
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.backend_api == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
