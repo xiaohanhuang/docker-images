@@ -525,15 +525,28 @@ jobs:
       - name: Generate SOCI indexes
         run: |
           IMAGES=(
-            "ml-platform/ml-gpu"
-            "ml-platform/flyte-gpu"
             "ml-platform/base-gpu"
+            "ml-platform/flyte-gpu"
+            "ml-platform/executor-pool"
+            "ml-platform/ray-worker"
+            "ml-platform/training-llm"
+            "ml-platform/ml-gpu"
+            "ml-platform/base-cpu"
+            "ml-platform/flyte-cpu"
+            "ml-platform/executor-pool-cpu"
+            "ml-platform/notebook-cpu"
+            "ml-platform/notebook-marimo"
+            "ml-platform/notebook-marimo-vscode"
+            "ml-platform/gpu-idle-monitor"
+            "ml-platform/spark-base"
+            "ml-platform/execution-service"
             "ml-platform/dashboard"
             "ml-platform/backend-api"
           )
           
           for IMAGE in "${IMAGES[@]}"; do
-            echo "Generating SOCI index for ${IMAGE}..."
+            echo "::group::Generating SOCI index for ${IMAGE}"
             standalone-soci-indexer ${{ env.ECR_REGISTRY }}/${IMAGE}:latest || echo "WARNING: Failed to index ${IMAGE}"
+            echo "::endgroup::"
           done
 
