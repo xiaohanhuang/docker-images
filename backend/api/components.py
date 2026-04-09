@@ -154,8 +154,20 @@ async def list_components() -> dict[str, Any]:
             logger.warning(f"Could not fetch Flyte workflows: {e}")
 
         if components:
-            components.sort(key=lambda x: x["name"])
-            return {"components": components}
+            # Deduplicate by name — prefer tasks over workflows (tasks
+            # carry container image info) and prefer entries with richer
+            # metadata (version != "unknown", non-empty category).
+            seen: dict[str, dict[str, Any]] = {}
+            for c in components:
+                existing = seen.get(c["name"])
+                if existing is None:
+                    seen[c["name"]] = c
+                elif c["type"] == "task" and existing["type"] == "workflow":
+                    seen[c["name"]] = c
+                elif c["category"] and not existing["category"]:
+                    seen[c["name"]] = c
+            deduped = sorted(seen.values(), key=lambda x: x["name"])
+            return {"components": deduped}
 
         # If reachable but empty, fall through to yaml-only data
     except Exception as e:

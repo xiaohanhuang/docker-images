@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/name: ai-capsule-dashboard
+    app.kubernetes.io/part-of: ai-capsule-platform
+  name: ai-capsule-dashboard
+  namespace: ml-platform
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ai-capsule-dashboard
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/name: ai-capsule-dashboard
+        app.kubernetes.io/part-of: ai-capsule-platform
+    spec:
+      containers:
+      - args:
+        - sed -i 's|http://localhost:8000|http://ml-platform-api.ml-platform-development.svc.cluster.local:8000|g'
+          /app/.next/routes-manifest.json && node server.js
+        command:
+        - /bin/sh
+        - -c
+        env:
+        - name: NODE_ENV
+          value: production
+        - name: NEXT_PUBLIC_API_URL
+          value: http://ml-platform-api.ml-platform.svc.cluster.local:8000
+        - name: AUTH_DISABLED
+          valueFrom:
+            configMapKeyRef:
+              key: auth-disabled
+              name: ai-capsule-config
+              optional: true
+        - name: OIDC_ISSUER_URL
+          valueFrom:
+            secretKeyRef:
+              key: issuer-url
+              name: ai-capsule-oidc
+              optional: true
+        image: ${ECR_REGISTRY}/ai-capsule-dashboard:1.0.0
+        livenessProbe:
+          httpGet:
+            path: /api/auth
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        name: dashboard
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /api/auth
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      - command:
+        - kubectl
+        - proxy
+        - --port=8001
+        - --accept-hosts=.*
+        - --address=0.0.0.0
+        image: bitnami/kubectl:1.31
+        name: kubectl-proxy
+        securityContext:
+          runAsUser: 1001
+      securityContext:
+        fsGroup: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        runAsUser: 1001
+      serviceAccountName: ai-capsule-dashboard
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: ai-capsule-dashboard
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: ai-capsule-dashboard
+    app.kubernetes.io/part-of: ai-capsule-platform
+  name: ai-capsule-dashboard
+  namespace: ml-platform
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/name: ai-capsule-dashboard
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations: null
+  labels:
+    app.kubernetes.io/name: ai-capsule-dashboard
+  name: ai-capsule-dashboard
+  namespace: ml-platform
+---
+apiVersion: v1
+data:
+  auth-disabled: 'false'
+kind: ConfigMap
+metadata:
+  name: ai-capsule-config
+  namespace: ml-platform

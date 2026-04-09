@@ -1,0 +1,332 @@
+
+> ml-platform-dashboard@0.1.0 dev
+> next dev
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/xiaohan/package-lock.json as the root directory.
+ To silence this warning, set `outputFileTracingRoot` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/output#caveats for more information.
+ Detected additional lockfiles: 
+   * /Users/xiaohan/ml-platform/projects/dashboard/package-lock.json
+
+   ▲ Next.js 15.5.13
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.68.102:3000
+
+ ✓ Starting...
+ ✓ Ready in 1301ms
+ ○ Compiling /capsules/[id] ...
+ ✓ Compiled /capsules/[id] in 598ms (894 modules)
+ GET /capsules/capsule-working-cpu 200 in 1258ms
+ GET /capsules/capsule-working-cpu 200 in 458ms
+ GET /capsules/capsule-working-cpu 200 in 245ms
+ GET /capsules/capsule-working-cpu 200 in 147ms
+ GET /capsules/capsule-working-cpu 200 in 136ms
+ GET /capsules/capsule-working-cpu 200 in 95ms
+ ✓ Compiled in 394ms (894 modules)
+Failed to proxy http://localhost:8000/capsules [Error: read ECONNRESET] {
+  errno: -54,
+  code: 'ECONNRESET',
+  syscall: 'read'
+}
+[Error: read ECONNRESET] {
+  errno: -54,
+  code: 'ECONNRESET',
+  syscall: 'read'
+}
+ ✓ Compiled /_error in 424ms (1245 modules)
+ GET /capsules/capsule-working-cpu 200 in 397ms
+ GET /capsules/capsule-working-cpu 200 in 19ms
+ GET /capsules/capsule-working-cpu 200 in 19ms
+ GET /capsules/capsule-working-cpu 200 in 16ms
+Failed to proxy http://localhost:8000/capsules [AggregateError: ] { code: 'ECONNREFUSED' }
+[AggregateError: ] { code: 'ECONNREFUSED' }
+Failed to proxy http://localhost:8000/capsules [AggregateError: ] { code: 'ECONNREFUSED' }
+[AggregateError: ] { code: 'ECONNREFUSED' }
+ GET /capsules/capsule-working-cpu 200 in 199ms
+ GET /capsules/capsule-working-cpu 200 in 135ms
+ GET /capsules/capsule-working-cpu 200 in 122ms
+ GET /capsules/capsule-working-cpu 200 in 200ms
+ ○ Compiling /capsules ...
+ ✓ Compiled /capsules in 660ms (1350 modules)
+ GET /capsules 200 in 817ms
+ GET /capsules/capsule-dummy-cpu 200 in 26ms
+ ✓ Compiled in 575ms (1326 modules)
+ GET /capsules/capsule-llm-dev 200 in 319ms
+ GET /capsules/capsule-llm-dev 200 in 172ms
+ GET /capsules/capsule-llm-dev 200 in 178ms
+ ✓ Compiled in 642ms (1326 modules)
+ GET /capsules/capsule-working-cpu 200 in 313ms
+Failed to proxy http://localhost:8000/capsules [AggregateError: ] { code: 'ECONNREFUSED' }
+[AggregateError: ] { code: 'ECONNREFUSED' }
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 601ms (1422 modules)
+Failed to proxy http://localhost:8000/capsules [AggregateError: ] { code: 'ECONNREFUSED' }
+[AggregateError: ] { code: 'ECONNREFUSED' }
+Failed to proxy http://localhost:8000/capsules [AggregateError: ] { code: 'ECONNREFUSED' }
+[AggregateError: ] { code: 'ECONNREFUSED' }
+Failed to proxy http://localhost:8000/capsules [AggregateError: ] { code: 'ECONNREFUSED' }
+[AggregateError: ] { code: 'ECONNREFUSED' }
+Failed to proxy http://localhost:8000/capsules [AggregateError: ] { code: 'ECONNREFUSED' }
+[AggregateError: ] { code: 'ECONNREFUSED' }
+ GET /capsules/capsule-working-cpu 200 in 274ms
+ GET /capsules/capsule-working-cpu 200 in 142ms
+ GET /capsules/capsule-working-cpu 200 in 203ms
+ GET /capsules/capsule-working-cpu 200 in 131ms
+ GET /capsules/capsule-working-cpu 200 in 164ms
+ GET /capsules/capsule-working-cpu 200 in 130ms
+ ✓ Compiled in 703ms (1326 modules)
+ GET /capsules/capsule-working-cpu 200 in 354ms
+Failed to proxy http://localhost:8000/capsules/capsule-dummy-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+Failed to proxy http://localhost:8000/capsules/capsule-llm-dev/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ✓ Compiled /_error in 267ms (1422 modules)
+ GET /capsules/capsule-working-cpu 200 in 274ms
+ ✓ Compiled in 734ms (1326 modules)
+ ✓ Compiled in 847ms (1326 modules)
+Failed to proxy http://localhost:8000/capsules/capsule-llm-dev/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+Failed to proxy http://localhost:8000/capsules/capsule-dummy-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ✓ Compiled /_error in 161ms (1422 modules)
+Failed to proxy http://localhost:8000/capsules/capsule-llm-dev/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ GET /capsules/capsule-working-cpu 200 in 209ms
+ ✓ Compiled in 500ms (1326 modules)
+ GET /capsules/capsule-working-cpu 200 in 317ms
+ GET /capsules 200 in 37ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1910ms (2265 modules)
+ GET / 200 in 2003ms
+ GET /capsules/capsule-working-cpu 200 in 322ms
+ ○ Compiling /chat ...
+ ✓ Compiled /chat in 1578ms (2344 modules)
+ GET /chat 200 in 1982ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /capsules/capsule-working-cpu 200 in 165ms
+ GET /capsules/capsule-working-cpu 200 in 1125ms
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 681ms (2440 modules)
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ✓ Compiled in 809ms (2344 modules)
+ ✓ Compiled in 376ms (2344 modules)
+ ✓ Compiled in 601ms (2344 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⨯ ReferenceError: CAPSULE_DB is not defined
+    at CapsuleIDEPage (app/capsules/[id]/page.tsx:105:19)
+  103 |   const router = useRouter();
+  104 |   const capsuleId = params.id as string;
+> 105 |   const capsule = CAPSULE_DB[capsuleId] || {
+      |                   ^
+  106 |     name: capsuleId, status: 'Running', gpu: 'A100', gpuCount: 1,
+  107 |     uptime: '—', burn_rate: 6.5, image: 'ml-base:latest', user: 'unknown',
+  108 |   }; {
+  digest: '4092646771'
+}
+ GET /capsules/capsule-working-cpu 500 in 506ms
+ ✓ Compiled in 580ms (2344 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /capsules/capsule-working-cpu 200 in 208ms
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 582ms (2440 modules)
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ✓ Compiled in 1426ms (2344 modules)
+ ✓ Compiled in 567ms (2344 modules)
+ ✓ Compiled in 241ms (2344 modules)
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ✓ Compiled /_error in 481ms (2440 modules)
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+Failed to proxy http://localhost:8000/capsules/capsule-working-cpu/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET / 200 in 538ms
+ GET /capsules 200 in 34ms
+ GET /capsules 200 in 600ms
+ GET /capsules/capsule-test-browser 200 in 136ms
+ GET /capsules 200 in 114ms
+ GET /capsules/capsule-test-browser 200 in 110ms
+Failed to proxy http://localhost:8000/capsules/capsule-test-browser/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+Failed to proxy http://localhost:8000/capsules/capsule-test-browser/start-vscode [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ GET /capsules 200 in 111ms
+ GET /capsules 200 in 87ms
+ GET /capsules/capsule-working-cpu 200 in 82ms
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET / 200 in 879ms
+ GET /capsules 200 in 250ms
+ ○ Compiling /jobs ...
+ ✓ Compiled /jobs in 2.8s (2353 modules)
+ GET /jobs 200 in 4149ms
+ ○ Compiling /experiments ...
+ ✓ Compiled /experiments in 1338ms (2368 modules)
+ GET /experiments 200 in 1901ms
+ ○ Compiling /models ...
+ ✓ Compiled /models in 564ms (2374 modules)
+ GET /models 200 in 1101ms
+ ○ Compiling /serving ...
+ ✓ Compiled /serving in 1087ms (2379 modules)
+ GET /serving 200 in 1320ms
+ ○ Compiling /infrastructure ...
+ ✓ Compiled /infrastructure in 827ms (2385 modules)
+ GET /infrastructure 200 in 1142ms
+ ○ Compiling /cost ...
+ ✓ Compiled /cost in 883ms (2371 modules)
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET /cost 200 in 1228ms
+ GET /infrastructure 200 in 130ms
+ ○ Compiling /ray ...
+ ✓ Compiled /ray in 518ms (2374 modules)
+ GET /ray 200 in 698ms
+ ○ Compiling /teams ...
+ ✓ Compiled /teams in 836ms (2385 modules)
+ GET /teams 200 in 1185ms
+ ○ Compiling /data ...
+ ✓ Compiled /data in 542ms (2398 modules)
+ GET /data 200 in 755ms
+ ○ Compiling /components-lib ...
+ ✓ Compiled /components-lib in 512ms (2401 modules)
+ GET /components-lib 200 in 784ms
+ ○ Compiling /chat ...
+ ✓ Compiled /chat in 558ms (1283 modules)
+ GET /chat 200 in 837ms
+ ○ Compiling /settings ...
+ ✓ Compiled /settings in 1852ms (2420 modules)
+ GET /settings 200 in 2187ms
+ ○ Compiling /recipes ...
+ ✓ Compiled /recipes in 684ms (2424 modules)
+ GET /recipes 200 in 889ms
+ ○ Compiling /recipes/[id] ...
+ ✓ Compiled /recipes/[id] in 896ms (2432 modules)
+ GET /recipes/llm-rlhf 200 in 1627ms
+ ✓ Compiled /jobs in 485ms (1275 modules)
+ GET /jobs 200 in 547ms
+ ○ Compiling /pipelines ...
+ ✓ Compiled /pipelines in 551ms (2434 modules)
+ GET /pipelines 200 in 758ms
+ GET /jobs 200 in 58ms
+ ✓ Compiled /workspace in 396ms (2439 modules)
+ GET /workspace 200 in 583ms
+ ✓ Compiled /capsules in 361ms (785 modules)
+ GET /capsules 200 in 586ms
+ ✓ Compiled in 1192ms (1158 modules)
+ ✓ Compiled in 949ms (1158 modules)
+ ✓ Compiled in 720ms (1158 modules)
+ ✓ Compiled in 1049ms (1929 modules)
+ ○ Compiling / ...
+ ✓ Compiled / in 934ms (1241 modules)
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET / 200 in 1325ms
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET / 200 in 205ms
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET / 200 in 106ms
+ ✓ Compiled in 1359ms (2393 modules)
+ ✓ Compiled in 321ms (1235 modules)
+ GET / 200 in 178ms
+ GET /capsules 200 in 176ms
+ ✓ Compiled in 928ms (2407 modules)
+ GET /capsules 200 in 76ms
+ GET / 200 in 78ms
+ GET /capsules 200 in 68ms
+ GET /capsules 200 in 33ms
+ GET /capsules 200 in 217ms
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET / 200 in 188ms
+ GET /capsules 200 in 27ms
+ ✓ Compiled in 1450ms (2393 modules)
+ ✓ Compiled in 1284ms (2393 modules)
+ ✓ Compiled in 1282ms (2393 modules)
+ GET /capsules 200 in 325ms
+The width(-1) and height(-1) of chart should be greater than 0,
+       please check the style of container, or the props width(100%) and height(100%),
+       or add a minWidth(0) or minHeight(undefined) or use aspect(undefined) to control the
+       height and width.
+ GET / 200 in 331ms
+ GET /capsules 200 in 20ms
+ GET /capsules 200 in 78ms
+ GET /capsules 200 in 28ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 3.6s (2382 modules)
+ GET /capsules 404 in 3365ms
+ GET /capsules 404 in 3420ms
+ GET /capsules 404 in 71ms
+ GET /capsules 404 in 74ms
+ GET /capsules 404 in 83ms
+ GET /capsules 404 in 79ms
+ GET /capsules 404 in 90ms
+ GET /capsules 404 in 94ms
+ GET /capsules 404 in 234ms
+ GET /capsules 404 in 235ms
+ GET /capsules 404 in 277ms
+ GET /capsules 404 in 101ms
+Failed to proxy http://localhost:8000/capsules [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 1391ms (2478 modules)
+ ✓ Compiled in 2.1s (2478 modules)
+ ⚠ Found a change in next.config.js. Restarting the server to apply the changes...
+   ▲ Next.js 15.5.13
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.68.103:3000
+
+ ✓ Starting...
+ ✓ Ready in 1564ms
+Failed to proxy http://localhost:8000/capsules [Error: socket hang up] { code: 'ECONNRESET' }
+[Error: socket hang up] { code: 'ECONNRESET' }
+ ✓ Compiled /_error in 370ms (381 modules)
+ ⚠ Found a change in next.config.js. Restarting the server to apply the changes...
+/Users/xiaohan/ml-platform/projects/dashboard/next.config.js:40
+    ];
+    ^
+
+SyntaxError: Unexpected token ']'
+    at wrapSafe (node:internal/modules/cjs/loader:1762:18)
+    at Module._compile (node:internal/modules/cjs/loader:1803:20)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1969:10)
+    at Module.load (node:internal/modules/cjs/loader:1552:32)
+    at Module._load (node:internal/modules/cjs/loader:1354:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at loadCJSModuleWithModuleLoad (node:internal/modules/esm/translators:325:3)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:230:7)
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:639:26)
+
+Node.js v25.8.2
+[?25h

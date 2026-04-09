@@ -1,0 +1,39 @@
+# ============================================================
+# AI Capsule Platform — Ingress (ALB)
+# Routes: /dashboard/* → ai-capsule-dashboard
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ai-capsule-dashboard
+  namespace: ml-platform
+  labels:
+    app.kubernetes.io/name: ai-capsule-dashboard
+    app.kubernetes.io/part-of: ai-capsule-platform
+  annotations:
+    # AWS ALB Ingress Controller
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: ${ACM_CERT_ARN}
+    alb.ingress.kubernetes.io/healthcheck-path: /api/auth
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    # Sticky sessions for WebSocket connections (if using real-time features)
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=86400
+spec:
+  ingressClassName: alb
+  rules:
+    - host: capsule.ml-platform.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ai-capsule-dashboard
+                port:
+                  number: 80

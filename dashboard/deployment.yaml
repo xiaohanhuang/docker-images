@@ -1,0 +1,260 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-platform
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ml-platform-dashboard
+  namespace: ml-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ml-platform-dashboard
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ml-platform-dashboard
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ml-platform-dashboard
+subjects:
+  - kind: ServiceAccount
+    name: ml-platform-dashboard
+    namespace: ml-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ml-platform-dashboard
+  namespace: ml-platform
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ml-platform-dashboard
+  namespace: ml-platform
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ml-platform-dashboard
+subjects:
+  - kind: ServiceAccount
+    name: ml-platform-dashboard
+    namespace: ml-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ml-platform-dashboard-flyte
+  namespace: flyte
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ml-platform-dashboard
+  namespace: flyte
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ml-platform-dashboard-flyte
+subjects:
+  - kind: ServiceAccount
+    name: ml-platform-dashboard
+    namespace: ml-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ml-platform-dashboard-monitoring
+  namespace: monitoring
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ml-platform-dashboard
+  namespace: monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ml-platform-dashboard-monitoring
+subjects:
+  - kind: ServiceAccount
+    name: ml-platform-dashboard
+    namespace: ml-platform
+---
+# Namespaced Role for desk pod proxy access in default namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ml-platform-dashboard
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/proxy"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ml-platform-dashboard
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ml-platform-dashboard
+subjects:
+  - kind: ServiceAccount
+    name: ml-platform-dashboard
+    namespace: ml-platform
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-platform-dashboard
+  namespace: ml-platform
+  labels:
+    app: ml-platform-dashboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ml-platform-dashboard
+  template:
+    metadata:
+      labels:
+        app: ml-platform-dashboard
+    spec:
+      serviceAccountName: ml-platform-dashboard
+      containers:
+        - name: dashboard
+          image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/dashboard:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "http://ml-platform-api.ml-platform-development.svc.cluster.local:8000"
+            - name: GRAFANA_URL
+              value: "http://grafana.ml-platform.internal"
+            - name: NODE_ENV
+              value: "production"
+            # While OIDC is not yet wired, return the dev user identity from /api/auth.
+            # Remove AUTH_DISABLED once OIDC is configured and /auth/me is fully tested.
+            - name: AUTH_DISABLED
+              value: "true"
+            - name: DEV_USERNAME
+              value: "xiaohan"
+            - name: DEV_DISPLAY_NAME
+              value: "Xiaohan Huang"
+            - name: DEV_EMAIL
+              value: "xiaohan@company.com"
+            - name: NEXT_PUBLIC_JUPYTERHUB_URL
+              value: "http://k8s-jupyter-jupyterh-827e6a6320-482154231.us-west-2.elb.amazonaws.com"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+        # kubectl-proxy sidecar: provides K8s API at localhost:8001
+        # for Next.js desk-proxy/desk-jupyter/desk-marimo rewrites
+        - name: kubectl-proxy
+          image: bitnami/kubectl:1.31
+          command: ["kubectl", "proxy", "--port=8001", "--address=127.0.0.1", "--accept-hosts=^localhost$,^127\\.0\\.0\\.1$"]
+          ports:
+            - containerPort: 8001
+              name: k8s-proxy
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-platform-dashboard
+  namespace: ml-platform
+  labels:
+    app: ml-platform-dashboard
+spec:
+  selector:
+    app: ml-platform-dashboard
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+      name: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ml-platform-dashboard
+  namespace: ml-platform
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/inbound-cidrs: "73.189.177.0/24,165.225.10.0/24,98.51.191.0/24"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ml-platform-dashboard
+                port:
+                  number: 80

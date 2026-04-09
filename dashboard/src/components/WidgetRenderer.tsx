@@ -1,0 +1,242 @@
+/**
+ * Config-driven widget renderer — renders Recharts charts from a WidgetSpec JSON.
+ */
+
+import {
+  LineChart, Line,
+  BarChart, Bar,
+  AreaChart, Area,
+  PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+
+const DEFAULT_COLORS = [
+  '#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe',
+  '#00c49f', '#ffbb28', '#ff8042', '#a4de6c', '#d0ed57',
+];
+
+interface WidgetSeries {
+  name: string;
+  dataKey: string;
+  color?: string;
+}
+
+export interface WidgetSpec {
+  type: 'line' | 'bar' | 'area' | 'pie' | 'stat' | 'table';
+  title: string;
+  description?: string;
+  data?: Record<string, any>[];
+  xAxisKey?: string;
+  series?: WidgetSeries[];
+  // Stat
+  value?: string;
+  unit?: string;
+  trend?: number;
+  // Table
+  columns?: string[];
+  rows?: (Record<string, any> | any[])[];
+  // Live
+  live?: boolean;
+  refreshQuery?: string;
+}
+
+interface WidgetRendererProps {
+  spec: WidgetSpec;
+  onPin?: (spec: WidgetSpec) => void;
+  className?: string;
+}
+
+export default function WidgetRenderer({ spec, onPin, className = '' }: WidgetRendererProps) {
+  return (
+    <div className={`rounded-lg border shadow-sm ${className}`} style={{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
+      <div className="card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 16px 8px 16px' }}>
+        <div>
+          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{spec.title}</h3>
+          {spec.description && (
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-dimmed)' }}>{spec.description}</p>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {spec.live && (
+            <span className="inline-flex items-center gap-1 text-xs text-green-600">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+              Live
+            </span>
+          )}
+          {onPin && (
+            <button
+              onClick={() => onPin(spec)}
+              className="text-xs text-gray-400 hover:text-blue-600 transition-colors"
+              title="Pin to workspace"
+            >
+              📌
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="px-4 pb-4">
+        {renderWidget(spec)}
+      </div>
+    </div>
+  );
+}
+
+function renderWidget(spec: WidgetSpec) {
+  switch (spec.type) {
+    case 'line': return <LineChartWidget spec={spec} />;
+    case 'bar': return <BarChartWidget spec={spec} />;
+    case 'area': return <AreaChartWidget spec={spec} />;
+    case 'pie': return <PieChartWidget spec={spec} />;
+    case 'stat': return <StatWidget spec={spec} />;
+    case 'table': return <TableWidget spec={spec} />;
+    default: return <p className="text-gray-500 text-sm">Unknown widget type: {spec.type}</p>;
+  }
+}
+
+function LineChartWidget({ spec }: { spec: WidgetSpec }) {
+  const series = spec.series || [];
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <LineChart data={spec.data}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey={spec.xAxisKey} tick={{ fontSize: 12 }} />
+        <YAxis tick={{ fontSize: 12 }} />
+        <Tooltip />
+        <Legend />
+        {series.map((s, i) => (
+          <Line
+            key={s.dataKey}
+            type="monotone"
+            dataKey={s.dataKey}
+            name={s.name}
+            stroke={s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length]}
+            strokeWidth={2}
+            dot={false}
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+function BarChartWidget({ spec }: { spec: WidgetSpec }) {
+  const series = spec.series || [];
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart data={spec.data}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey={spec.xAxisKey} tick={{ fontSize: 12 }} />
+        <YAxis tick={{ fontSize: 12 }} />
+        <Tooltip />
+        <Legend />
+        {series.map((s, i) => (
+          <Bar
+            key={s.dataKey}
+            dataKey={s.dataKey}
+            name={s.name}
+            fill={s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length]}
+          />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function AreaChartWidget({ spec }: { spec: WidgetSpec }) {
+  const series = spec.series || [];
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <AreaChart data={spec.data}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey={spec.xAxisKey} tick={{ fontSize: 12 }} />
+        <YAxis tick={{ fontSize: 12 }} />
+        <Tooltip />
+        <Legend />
+        {series.map((s, i) => (
+          <Area
+            key={s.dataKey}
+            type="monotone"
+            dataKey={s.dataKey}
+            name={s.name}
+            stroke={s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length]}
+            fill={s.color || DEFAULT_COLORS[i % DEFAULT_COLORS.length]}
+            fillOpacity={0.3}
+          />
+        ))}
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
+function PieChartWidget({ spec }: { spec: WidgetSpec }) {
+  const data = spec.data || [];
+  return (
+    <ResponsiveContainer width="100%" height={300}>
+      <PieChart>
+        <Pie
+          data={data}
+          dataKey={spec.series?.[0]?.dataKey || 'value'}
+          nameKey={spec.xAxisKey || 'name'}
+          cx="50%"
+          cy="50%"
+          outerRadius={100}
+          label={({ name, percent }: any) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`}
+        >
+          {data.map((_, i) => (
+            <Cell key={i} fill={DEFAULT_COLORS[i % DEFAULT_COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+}
+
+function StatWidget({ spec }: { spec: WidgetSpec }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 0' }}>
+      <div>
+        <div className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          {spec.value}
+          {spec.unit && <span className="text-lg ml-1" style={{ color: 'var(--text-dimmed)' }}>{spec.unit}</span>}
+        </div>
+        {spec.trend !== undefined && spec.trend !== null && (
+          <div className={`text-sm mt-1 ${spec.trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {spec.trend >= 0 ? '↑' : '↓'} {Math.abs(spec.trend).toFixed(1)}%
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TableWidget({ spec }: { spec: WidgetSpec }) {
+  const columns = spec.columns || [];
+  const rows = spec.rows || [];
+  return (
+    <div className="overflow-x-auto max-h-80">
+      <table className="min-w-full text-sm">
+        <thead style={{ background: 'rgba(255, 255, 255, 0.03)' }}>
+          <tr>
+            {columns.map((col) => (
+              <th key={col} className="px-3 py-2 text-left font-medium" style={{ color: 'var(--text-muted)' }}>
+                {col}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody style={{ borderTop: '1px solid var(--card-border)' }}>
+          {rows.map((row, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid var(--card-border)' }} className="hover:bg-white/5 transition-colors">
+              {columns.map((col, colIdx) => (
+                <td key={col} className="px-3 py-2" style={{ color: 'var(--text-primary)' }}>
+                  {String(Array.isArray(row) ? (row[colIdx] ?? '') : (row[col] ?? ''))}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
