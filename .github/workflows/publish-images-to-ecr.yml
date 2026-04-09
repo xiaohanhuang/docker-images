@@ -160,6 +160,7 @@ jobs:
           file: images/base/gpu-torch/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/base-gpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/base-gpu:${{ github.sha }}
@@ -174,6 +175,7 @@ jobs:
           file: images/framework/flyte-gpu/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/flyte-gpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/flyte-gpu:${{ github.sha }}
@@ -189,6 +191,7 @@ jobs:
           file: images/workload/executor-gpu/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool:${{ github.sha }}
@@ -203,6 +206,7 @@ jobs:
           file: images/framework/ray-gpu/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           build-args: |
             BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/base-gpu:latest
           tags: |
@@ -220,6 +224,7 @@ jobs:
           file: images/workload/training-llm/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           build-args: |
             BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:latest
             MLFLOW_VERSION=3.10.0
@@ -239,6 +244,7 @@ jobs:
           file: images/workload/ml-gpu/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           build-args: |
             REGISTRY=${{ env.ECR_REGISTRY }}
             REPO=ml-platform
@@ -282,6 +288,7 @@ jobs:
           file: images/base/cpu/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/base-cpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/base-cpu:${{ github.sha }}
@@ -296,6 +303,7 @@ jobs:
           file: images/framework/flyte-cpu/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/flyte-cpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/flyte-cpu:${{ github.sha }}
@@ -310,6 +318,7 @@ jobs:
           file: images/workload/executor-cpu/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool-cpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool-cpu:${{ github.sha }}
@@ -349,6 +358,7 @@ jobs:
           file: projects/jupyter/images/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:${{ github.sha }}
@@ -363,6 +373,7 @@ jobs:
           file: projects/jupyter/images/Dockerfile.marimo
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo:${{ github.sha }}
@@ -377,6 +388,7 @@ jobs:
           file: projects/jupyter/images/Dockerfile.marimo.vscode
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo-vscode:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo-vscode:${{ github.sha }}
@@ -391,6 +403,7 @@ jobs:
           file: projects/jupyter/gpu-idle-monitor/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/gpu-idle-monitor:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/gpu-idle-monitor:${{ github.sha }}
@@ -405,6 +418,7 @@ jobs:
           file: projects/spark/images/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/spark-base:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/spark-base:${{ github.sha }}
@@ -419,6 +433,7 @@ jobs:
           file: projects/components/services/execution-service/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/execution-service:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/execution-service:${{ github.sha }}
@@ -455,6 +470,7 @@ jobs:
           file: projects/dashboard/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/dashboard:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/dashboard:${{ github.sha }}
@@ -466,6 +482,7 @@ jobs:
           file: backend/Dockerfile
           platforms: linux/amd64
           push: true
+          provenance: false
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/backend-api:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/backend-api:${{ github.sha }}
