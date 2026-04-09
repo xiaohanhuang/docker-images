@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
     ca-certificates \
+    openssh-server \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip once here so every child layer inherits it
