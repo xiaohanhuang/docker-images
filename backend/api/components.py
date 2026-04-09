@@ -128,7 +128,10 @@ async def list_components() -> dict[str, Any]:
         except Exception as e:
             logger.warning(f"Could not fetch Flyte tasks: {e}")
 
-        # 2. Fetch workflow components from Flyte
+        # 2. Fetch workflow components from Flyte — only include workflows
+        #    that have an explicit component.yaml (i.e. registered as a
+        #    shareable component).  Other workflows are pipelines/glue and
+        #    should not appear in the component library.
         try:
             wf_data = await svc_get(
                 "flyte_http",
@@ -138,6 +141,8 @@ async def list_components() -> dict[str, Any]:
             for entity in wf_data.get("entities", []):
                 full_name = entity.get("name", "")
                 meta = _resolve_component(full_name, yaml_registry)
+                if not meta.get("name"):
+                    continue  # no component.yaml → skip
                 func_name = full_name.split(".")[-1]
                 version = meta.get("version") or await _get_flyte_version("workflows", full_name)
                 components.append(
