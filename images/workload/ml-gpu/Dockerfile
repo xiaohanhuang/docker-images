@@ -40,4 +40,8 @@ RUN pip install --no-cache-dir \
     rouge-score==${ROUGE_VERSION} \
     sentencepiece==${SENTENCEPIECE_VERSION}
 
+# Install ML Platform SDK
+COPY projects/components/sdk /tmp/sdk
+RUN pip install --no-cache-dir /tmp/sdk && rm -rf /tmp/sdk
+
 WORKDIR /root
