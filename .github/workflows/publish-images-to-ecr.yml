@@ -534,9 +534,13 @@ jobs:
           for img in "${IMAGES[@]}"; do
             REF="${ECR_REGISTRY}/ml-platform/${img}:latest"
             echo "::group::SOCI index for ${img}"
+            
+            echo "📥 Pulling image into containerd for SOCI generation..."
+            sudo ctr i pull --user "AWS:$(aws ecr get-login-password --region ${AWS_REGION})" "${REF}" || true
+            
             echo "📥 Creating SOCI index for ${REF}..."
-            if soci create "${REF}" 2>&1; then
-              soci push "${REF}" 2>&1 && echo "✅ SOCI index pushed for ${img}" || echo "⚠️ SOCI push failed for ${img}"
+            if sudo soci create "${REF}" 2>&1; then
+              sudo soci push --user "AWS:$(aws ecr get-login-password --region ${AWS_REGION})" "${REF}" 2>&1 && echo "✅ SOCI index pushed for ${img}" || echo "⚠️ SOCI push failed for ${img}"
             else
               echo "⚠️ SOCI create failed for ${img} (image may not have been built this run)"
             fi
