@@ -69,6 +69,7 @@ class Platform:
         dataloader=None,
         strategy: str = "auto",
         mixed_precision: str | None = "bf16",
+        batch_size: int | None = None,
     ):
         """Wrap *model*, *optimizer*, and optional *dataloader* for distributed training.
 
@@ -78,6 +79,8 @@ class Platform:
             dataloader: Optional ``torch.utils.data.DataLoader``.
             strategy: ``"auto"``, ``"ddp"``, ``"fsdp"``, or ``"deepspeed"``.
             mixed_precision: ``"fp16"``, ``"bf16"``, or ``None``.
+            batch_size: Optional per-GPU batch size for better memory estimation
+                when ``strategy="auto"``.
 
         Returns:
             Tuple of (model, optimizer, dataloader).
@@ -110,7 +113,7 @@ class Platform:
             model = model.to(device)
 
         if strategy == "auto":
-            strategy = self._heuristics(model)
+            strategy = self._heuristics(model, batch_size=batch_size)
 
         # 2. Strategy wrapping (skip if single-process / local dev)
         if world_size > 1:
@@ -194,13 +197,47 @@ class Platform:
 
         return model, optimizer, dataloader
 
-    def _heuristics(self, model) -> str:
-        """Choose strategy based on model size and GPU VRAM."""
+    def _heuristics(self, model, *, batch_size: int | None = None) -> str:
+        """Choose strategy based on model size and GPU VRAM.
+
+        - DDP when the full training footprint fits in a single GPU (<50% VRAM).
+        - FSDP when sharding across GPUs is sufficient.
+        - DeepSpeed when the model is too large even after sharding across all
+          GPUs, requiring CPU/NVMe offloading.
+
+        Memory estimate includes:
+        - Parameters (dtype-aware)
+        - Gradients (same size as params)
+        - Optimizer states (2x params for Adam momentum + variance)
+        - Activations (scaled by batch_size when known, otherwise ~1x params)
+        """
         import torch
 
         num_params = sum(p.numel() for p in model.parameters())
-        # Estimate total memory: params * 4 bytes * 4x for optimizer states
-        total_mem_est = num_params * 4 * 4
+        param_dtype = next(model.parameters()).dtype
+        bytes_per_param = 2 if param_dtype in (torch.float16, torch.bfloat16) else 4
+
+        param_mem = num_params * bytes_per_param
+        grad_mem = param_mem
+        # Adam keeps fp32 copies of momentum + variance regardless of param dtype
+        optimizer_mem = num_params * 4 * 2
+        # Activation memory: activations are produced and consumed layer by
+        # layer, so peak usage is proportional to the largest single layer
+        # (not total params).  We approximate per-layer activation size by the
+        # parameter count of the largest layer, and scale by batch_size.
+        max_layer_params = max(
+            (
+                sum(p.numel() for p in m.parameters(recurse=False))
+                for m in model.modules()
+                if sum(1 for _ in m.parameters(recurse=False)) > 0
+            ),
+            default=num_params,
+        )
+        activation_mem = max_layer_params * bytes_per_param
+        if batch_size is not None and batch_size > 0:
+            activation_mem *= batch_size
+
+        total_mem_est = param_mem + grad_mem + optimizer_mem + activation_mem
 
         if not torch.cuda.is_available():
             return "ddp"
@@ -208,14 +245,29 @@ class Platform:
         try:
             gpu_vram = torch.cuda.get_device_properties(0).total_memory
         except Exception:
-            gpu_vram = 8 * 1024**3
+            gpu_vram = 24 * 1024**3  # assume A10G (24 GB)
 
-        if total_mem_est < gpu_vram * 0.5:
+        # Reserve ~10% for CUDA context, NCCL buffers, cuDNN workspace,
+        # and memory fragmentation overhead.
+        usable_vram = gpu_vram * 0.9
+
+        # Model fits on a single GPU → DDP (fastest)
+        if total_mem_est < usable_vram * 0.5:
             return "ddp"
-        elif total_mem_est < gpu_vram * 2:
-            return "fsdp"
-        else:
+
+        # FSDP/DeepSpeed shard params + grads + optimizer, but NOT activations.
+        # Each GPU still holds full activations for its micro-batch.
+        shardable_mem = param_mem + grad_mem + optimizer_mem
+        world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        num_gpus = max(1, world_size)
+        per_gpu_sharded = shardable_mem / num_gpus + activation_mem
+
+        # If even after sharding the per-GPU footprint exceeds 80% usable VRAM,
+        # we need CPU offloading → DeepSpeed ZeRO-Infinity
+        if per_gpu_sharded > usable_vram * 0.8:
             return "deepspeed"
+
+        return "fsdp"
 
 
 platform = Platform()
