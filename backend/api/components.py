@@ -321,42 +321,114 @@ async def _fetch_flyte_task_detail(flyte_name: str) -> dict[str, Any] | None:
         return None
 
 
+async def _fetch_flyte_workflow_detail(flyte_name: str) -> dict[str, Any] | None:
+    """Fetch the latest version of a Flyte workflow with interface details."""
+    try:
+        data = await svc_get(
+            "flyte_http",
+            f"api/v1/workflows/ml-platform/development/{flyte_name}",
+            params={
+                "limit": 1,
+                "sort_by.key": "created_at",
+                "sort_by.direction": "DESCENDING",
+            },
+        )
+        workflows = data.get("workflows", [])
+        if not workflows:
+            return None
+        wf = workflows[0]
+        wf_id = wf["id"]
+        iface = (
+            wf.get("closure", {})
+            .get("compiled_workflow", {})
+            .get("primary", {})
+            .get("template", {})
+            .get("interface", {})
+        )
+
+        inputs = []
+        for pname, pval in iface.get("inputs", {}).get("variables", {}).items():
+            inputs.append({"name": pname, "type": _format_flyte_type(pval.get("type", {}))})
+        outputs = []
+        for pname, pval in iface.get("outputs", {}).get("variables", {}).items():
+            outputs.append({"name": pname, "type": _format_flyte_type(pval.get("type", {}))})
+
+        return {
+            "version": wf_id.get("version", ""),
+            "task_type": "workflow",
+            "image": "",
+            "inputs": inputs,
+            "outputs": outputs,
+        }
+    except Exception as e:
+        logger.warning(f"Could not fetch Flyte workflow detail for {flyte_name}: {e}")
+        return None
+
+
 @router.get("/{name}")
 async def get_component(name: str) -> dict[str, Any]:
     """Return detailed metadata for a single component.
 
-    Merges component.yaml metadata with live Flyte task details (inputs,
-    outputs, container image, version).
+    Merges component.yaml metadata with live Flyte task/workflow details
+    (inputs, outputs, container image, version).
     """
     yaml_registry = _load_component_registry()
     meta = yaml_registry.get(name)
 
-    # Find the Flyte entity name(s) to query
     flyte_detail: dict[str, Any] | None = None
-    # Try common Flyte path patterns for this component
+
+    # Build candidate Flyte entity names to query
+    task_candidates: list[str] = []
+    wf_candidates: list[str] = []
+
     if meta:
         category = meta.get("category", "")
-        candidates = [
-            f"components.{category}.{name}.task.{name}",
-        ]
-        # Also scan task_ids for a match
-        try:
-            tasks_data = await svc_get(
-                "flyte_http",
-                "api/v1/task_ids/ml-platform/development",
-                params={"limit": 100},
-            )
-            for entity in tasks_data.get("entities", []):
-                full_name = entity.get("name", "")
-                parts = full_name.split(".")
-                if len(parts) >= 4 and parts[0] == "components" and parts[2] == name:
-                    if full_name not in candidates:
-                        candidates.insert(0, full_name)
-        except Exception:
-            pass
+        task_candidates.append(f"components.{category}.{name}.task.{name}")
 
-        for candidate in candidates:
-            flyte_detail = await _fetch_flyte_task_detail(candidate)
+    # Scan Flyte task_ids and workflow_ids for matches
+    try:
+        tasks_data = await svc_get(
+            "flyte_http",
+            "api/v1/task_ids/ml-platform/development",
+            params={"limit": 100},
+        )
+        for entity in tasks_data.get("entities", []):
+            full_name = entity.get("name", "")
+            parts = full_name.split(".")
+            func_name = parts[-1] if parts else ""
+            # Match by component dir or by function name
+            if len(parts) >= 4 and parts[0] == "components" and parts[2] == name:
+                if full_name not in task_candidates:
+                    task_candidates.insert(0, full_name)
+            elif func_name == name and full_name not in task_candidates:
+                task_candidates.append(full_name)
+    except Exception:
+        pass
+
+    try:
+        wf_data = await svc_get(
+            "flyte_http",
+            "api/v1/workflow_ids/ml-platform/development",
+            params={"limit": 100},
+        )
+        for entity in wf_data.get("entities", []):
+            full_name = entity.get("name", "")
+            parts = full_name.split(".")
+            func_name = parts[-1] if parts else ""
+            if func_name == name and full_name not in wf_candidates:
+                wf_candidates.append(full_name)
+    except Exception:
+        pass
+
+    # Try tasks first, then workflows
+    for candidate in task_candidates:
+        flyte_detail = await _fetch_flyte_task_detail(candidate)
+        if flyte_detail:
+            break
+
+    if not flyte_detail:
+        for candidate in wf_candidates:
+            flyte_detail = await _fetch_flyte_workflow_detail(candidate)
             if flyte_detail:
                 break
 
