@@ -33,6 +33,9 @@ RUN pip install --no-cache-dir "setuptools<70" wheel && \
     torch-tb-profiler \
     flytekit==1.16.14
 
+# Remove distutils-installed blinker 1.4 (Ubuntu system pkg) that blocks pip uninstall
+RUN rm -rf /usr/lib/python3/dist-packages/blinker* || true
+
 # Install the ML Platform SDK so tasks can use `import ml_platform_sdk as mp`
 COPY projects/components/sdk /tmp/ml-platform-sdk
 RUN pip install --no-cache-dir /tmp/ml-platform-sdk && rm -rf /tmp/ml-platform-sdk

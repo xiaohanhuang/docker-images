@@ -28,6 +28,9 @@ RUN pip install --no-cache-dir "setuptools<70" wheel && \
     s3fs==${S3FS_VERSION} \
     requests==${REQUESTS_VERSION}
 
+# Remove distutils-installed blinker 1.4 (Ubuntu system pkg) that blocks pip uninstall
+RUN rm -rf /usr/lib/python3/dist-packages/blinker* || true
+
 # Install the ML Platform SDK so all downstream images can use
 # `import ml_platform_sdk as mp` instead of raw flytekit APIs.
 COPY projects/components/sdk /tmp/ml-platform-sdk
