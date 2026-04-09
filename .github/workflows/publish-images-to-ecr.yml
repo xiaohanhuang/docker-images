@@ -507,6 +507,10 @@ jobs:
         run: |
           set +e  # Don't fail the workflow if individual index generation fails
 
+          # SOCI needs write access to its state directory
+          sudo mkdir -p /var/lib/soci-snapshotter-grpc
+          sudo chown "$(id -u):$(id -g)" /var/lib/soci-snapshotter-grpc
+
           IMAGES=(
             base-gpu
             executor-pool
