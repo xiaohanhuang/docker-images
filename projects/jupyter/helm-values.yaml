@@ -40,9 +40,9 @@ hub:
 debug:
   enabled: false
 
-# Built-in pre-puller disabled — it pulls ALL images on ALL nodes and cannot
-# target different images to CPU vs GPU nodes.  Custom DaemonSets in
-# image-prepuller.yaml handle node-targeted pre-pulling instead.
+# Built-in pre-puller disabled — SOCI lazy-loading on Karpenter nodes
+# eliminates the need for any pre-pulling.  Containers boot in ~1 second
+# by streaming image layers on-demand from ECR.
 prePuller:
   hook:
     enabled: false
