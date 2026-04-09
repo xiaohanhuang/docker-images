@@ -1,0 +1,37 @@
+name: Build SOCI Lambdas
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout AWS SOCI Index Builder
+        run: |
+          git clone https://github.com/awslabs/cfn-ecr-aws-soci-index-builder.git
+          cd cfn-ecr-aws-soci-index-builder
+          
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.20'
+          
+      - name: Build Go Lambda
+        run: |
+          cd cfn-ecr-aws-soci-index-builder/functions/source/soci-index-generator-lambda
+          make default
+          mkdir -p ../../packages/soci-index-generator-lambda
+          mv soci_index_generator_lambda.zip ../../packages/soci-index-generator-lambda/
+          
+      - name: Zip Python Lambda
+        run: |
+          cd cfn-ecr-aws-soci-index-builder/functions/source/ecr-image-action-event-filtering
+          mkdir -p ../../packages/ecr-image-action-event-filtering
+          zip -r ../../packages/ecr-image-action-event-filtering/lambda.zip .
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-packages
+          path: cfn-ecr-aws-soci-index-builder/functions/packages/
