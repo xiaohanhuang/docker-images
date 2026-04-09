@@ -34,7 +34,9 @@ RUN pip install --no-cache-dir \
     requests==${REQUESTS_VERSION}
 
 # Install ML Platform SDK dynamically without leaving source layer bloat
-RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk \
-    pip install --no-cache-dir /tmp/sdk
+RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk-src \
+    cp -r /tmp/sdk-src /tmp/sdk && \
+    pip install --no-cache-dir /tmp/sdk && \
+    rm -rf /tmp/sdk
 
 WORKDIR /root
