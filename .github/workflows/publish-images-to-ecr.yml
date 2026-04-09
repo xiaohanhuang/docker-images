@@ -487,3 +487,53 @@ jobs:
             ${{ env.ECR_REGISTRY }}/ml-platform/backend-api:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/backend-api:${{ github.sha }}
 
+  generate-soci-indexes:
+    name: Generate and Push SOCI Indexes
+    runs-on: ubuntu-latest
+    needs: [build-public-images, build-proprietary-services]
+    if: always() && (needs.build-public-images.result == 'success' || needs.build-proprietary-services.result == 'success')
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+        
+      - name: Install standalone-soci-indexer
+        run: |
+          LATEST_VERSION=$(curl -fsS https://api.github.com/repos/CloudSnorkel/standalone-soci-indexer/releases/latest | jq -r .tag_name)
+          curl -fsSL https://github.com/CloudSnorkel/standalone-soci-indexer/releases/download/${LATEST_VERSION}/standalone-soci-indexer_Linux_x86_64.tar.gz | tar xz
+          sudo mv standalone-soci-indexer /usr/local/bin/
+          
+      - name: Generate SOCI indexes
+        run: |
+          IMAGES=(
+            "ml-platform/ml-gpu"
+            "ml-platform/flyte-gpu"
+            "ml-platform/base-gpu"
+            "ml-platform/dashboard"
+            "ml-platform/backend-api"
+          )
+          
+          for IMAGE in "${IMAGES[@]}"; do
+            echo "Generating SOCI index for ${IMAGE}..."
+            standalone-soci-indexer ${{ env.ECR_REGISTRY }}/${IMAGE}:latest || echo "WARNING: Failed to index ${IMAGE}"
+          done
+
