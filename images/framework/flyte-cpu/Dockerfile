@@ -29,9 +29,4 @@ RUN pip install --no-cache-dir \
     s3fs==${S3FS_VERSION} \
     requests==${REQUESTS_VERSION}
 
-# Install the ML Platform SDK so all downstream images can use
-# `import ml_platform_sdk as mp` instead of raw flytekit APIs.
-COPY projects/components/sdk /tmp/ml-platform-sdk
-RUN pip install --no-cache-dir /tmp/ml-platform-sdk && rm -rf /tmp/ml-platform-sdk
-
 WORKDIR /root

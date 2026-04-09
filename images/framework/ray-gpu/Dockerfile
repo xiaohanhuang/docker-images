@@ -16,29 +16,22 @@
 # Parent: base-gpu-torch    Child images: training-llm
 # ============================================================
 
-ARG BASE_IMAGE=805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/base-gpu:latest
-FROM ${BASE_IMAGE}
+ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
+ARG REPO=ml-platform
+ARG BASE_TAG=cu12.9-torch2.10-1.1.0
+FROM ${REGISTRY}/${REPO}/base-gpu-torch:${BASE_TAG}
 
 ARG RAY_VERSION=2.54.0
 
-RUN pip install --no-cache-dir "setuptools<70" wheel && \
-    pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     "ray[default]==${RAY_VERSION}" \
-    "pandas>=2.1.0" \
-    "numpy>=1.26.0" \
+    pandas \
+    numpy \
     pyarrow \
     requests \
     boto3 \
     s3fs \
-    torch-tb-profiler \
-    flytekit==1.16.14
-
-# Remove distutils-installed blinker 1.4 (Ubuntu system pkg) that blocks pip uninstall
-RUN rm -rf /usr/lib/python3/dist-packages/blinker* || true
-
-# Install the ML Platform SDK so tasks can use `import ml_platform_sdk as mp`
-COPY projects/components/sdk /tmp/ml-platform-sdk
-RUN pip install --no-cache-dir /tmp/ml-platform-sdk && rm -rf /tmp/ml-platform-sdk
+    torch-tb-profiler
 
 EXPOSE 6379 8265 10001 8000
 

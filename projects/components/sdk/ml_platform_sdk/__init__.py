@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import functools
+import os
 from typing import Callable, Dict
+
+# Suppress noisy flytekit type warnings in notebooks
+os.environ["FLYTE_SDK_LOGGING_LEVEL"] = "40"
 
 import flytekit
 from flytekit import Resources, dynamic, eager, map_task
 from flytekit.types.directory import FlyteDirectory  # noqa: F401
 from flytekit.types.file import FlyteFile  # noqa: F401
 
-from .checkpoint import CheckpointManager, HuggingFaceCheckpointManager
-from .components import (
-    Component,
-    Pipeline,
-    _workflow_versions,
+from .catalog import (
     data_splitter,
     deploy_vllm,
     download_dataset,
@@ -29,6 +29,12 @@ from .components import (
     text2sql_pipeline,
     tokenizer,
     vllm_deployer,
+)
+from .checkpoint import CheckpointManager, HuggingFaceCheckpointManager
+from .components import (
+    Component,
+    Pipeline,
+    _workflow_versions,
 )
 from .tasks.accelerate import accelerate_task, platform
 from .tasks.tensorboard import get_summary_writer
@@ -105,6 +111,15 @@ def submit(
     """
     import os
 
+    # Auto-load .env (same pattern as remote.py) so notebooks get
+    # FLYTE_ENDPOINT, FLYTE_PROJECT, etc. without manual setup.
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except ImportError:
+        pass
+
     # Import from cli.utils if available; fall back to direct flytekit config
     # for SDK-only environments (e.g., notebooks without the CLI package).
     try:
@@ -128,6 +143,57 @@ def submit(
     proj = project or os.getenv("FLYTE_PROJECT", cfg.get("flyte_project", "ml-platform"))
     dom = domain or os.getenv("FLYTE_DOMAIN", cfg.get("flyte_domain", "development"))
 
+    # (Version generation moved further down with error handling)
+
+    # Get default image from config or use a sensible fallback
+    default_image = cfg.get(
+        "default_image", "805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/base-cpu:latest"
+    )
+
+    from flytekit.configuration import Image, ImageConfig
+
+    # Parse image string (e.g., registry/repo:tag)
+    if ":" in default_image:
+        fqn, tag = default_image.rsplit(":", 1)
+    else:
+        fqn, tag = default_image, "latest"
+
+    img = Image(name="default", fqn=fqn, tag=tag)
+    ImageConfig(default_image=img)
+
+    # Auto-generate a version hash
+    import hashlib
+    import inspect
+
+    try:
+        src = inspect.getsource(entity)
+        digest = hashlib.md5(src.encode()).hexdigest()[:8]  # noqa: S324
+        version = version if version != "latest" else "nb-" + digest
+    except Exception:
+        version = version if version != "latest" else "nb-interactive"
+
+    # Explicitly register the entity before executing
+    print(f"[mp.submit] Registering {entity.name} (version={version})...")
+    try:
+        from flytekit.core.python_function_task import EagerAsyncPythonFunctionTask
+        from flytekit.core.workflow import WorkflowBase
+
+        if isinstance(entity, EagerAsyncPythonFunctionTask):
+            raise TypeError(
+                f"{entity.name} is an @eager function. Use `await {entity.name}(...)` "
+                f"in a notebook cell instead of mp.submit(). Eager functions run locally "
+                f"and dispatch sub-tasks to the cluster via FlyteRemote."
+            )
+        elif isinstance(entity, WorkflowBase):
+            remote.register_workflow(entity, version=version)
+        else:
+            remote.register_task(entity, version=version)
+    except TypeError:
+        raise
+    except Exception as e:
+        print(f"[mp.submit] Note: Registration warning: {e}")
+
+    print(f"[mp.submit] Executing {entity.name}...")
     execution = remote.execute(
         entity,
         inputs=inputs or {},

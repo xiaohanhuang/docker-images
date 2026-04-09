@@ -13,27 +13,20 @@
 # Parent: base-gpu-torch    Child images: ml-gpu, genai-gpu
 # ============================================================
 
-ARG BASE_IMAGE=805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/base-gpu:latest
-FROM ${BASE_IMAGE}
+ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
+ARG REPO=ml-platform
+ARG BASE_TAG=cu12.9-torch2.10-1.1.0
+FROM ${REGISTRY}/${REPO}/base-gpu-torch:${BASE_TAG}
 
 ARG FLYTEKIT_VERSION=1.16.14
 ARG BOTO3_VERSION=1.42.61
 ARG S3FS_VERSION=2026.2.0
 ARG REQUESTS_VERSION=2.32.5
 
-RUN pip install --no-cache-dir "setuptools<70" wheel && \
-    pip install --no-cache-dir \
+RUN pip install --no-cache-dir \
     flytekit==${FLYTEKIT_VERSION} \
     boto3==${BOTO3_VERSION} \
     s3fs==${S3FS_VERSION} \
     requests==${REQUESTS_VERSION}
-
-# Remove distutils-installed blinker 1.4 (Ubuntu system pkg) that blocks pip uninstall
-RUN rm -rf /usr/lib/python3/dist-packages/blinker* || true
-
-# Install the ML Platform SDK so all downstream images can use
-# `import ml_platform_sdk as mp` instead of raw flytekit APIs.
-COPY projects/components/sdk /tmp/ml-platform-sdk
-RUN pip install --no-cache-dir /tmp/ml-platform-sdk && rm -rf /tmp/ml-platform-sdk
 
 WORKDIR /root

@@ -352,6 +352,7 @@ def accelerate_task(
     pytorch_config = PyTorch(
         master=Worker(replicas=1),
         worker=Worker(replicas=max(0, num_nodes - 1)),
+        increase_shared_mem=False,
     )
 
     res = Resources(cpu=cpu, mem=mem, gpu=str(gpus_per_node))
@@ -385,6 +386,7 @@ def accelerate_task(
             requests=res,
             limits=res,
             pod_template=pod_template,
+            shared_memory=True,
             **task_kwargs,
         )
         @functools.wraps(fn)

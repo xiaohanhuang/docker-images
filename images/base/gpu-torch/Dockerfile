@@ -47,7 +47,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12-venv \
     python3.12-dev \
     && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.12 \
-    && python3.12 -m pip install --no-cache-dir "setuptools<70" wheel \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure SSH for debugging (In prod, use non-root and properly managed keys)

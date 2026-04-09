@@ -2,11 +2,119 @@ import json
 import logging
 from typing import Any, Dict
 
-from flytekit import Resources, task
+from flytekit import PodTemplate, Resources, task
 from flytekit.types.directory import FlyteDirectory
 from flytekitplugins.ray import HeadNodeConfig, RayJobConfig, WorkerNodeConfig
 
 logger = logging.getLogger(__name__)
+
+
+def ray_gpu_config(
+    num_workers: int = 2,
+    gpu_per_worker: int = 1,
+    worker_cpu: str = "3",
+    worker_mem: str = "12Gi",
+    head_cpu: str = "2",
+    head_mem: str = "8Gi",
+    separate_nodes: bool = True,
+) -> RayJobConfig:
+    """Build a RayJobConfig for GPU training with sensible defaults.
+
+    Handles GPU tolerations, anti-affinity (one worker per node), and
+    resource requests — so pipeline code stays simple.
+
+    Args:
+        num_workers: Number of Ray GPU workers.
+        gpu_per_worker: GPUs per worker (default 1).
+        worker_cpu: CPU request per worker.
+        worker_mem: Memory request per worker.
+        head_cpu: CPU request for the Ray head node.
+        head_mem: Memory request for the Ray head node.
+        separate_nodes: Force workers onto different nodes (anti-affinity).
+
+    Returns:
+        A RayJobConfig ready to use as ``task_config``.
+    """
+    from kubernetes.client import (
+        V1Affinity,
+        V1Container,
+        V1LabelSelector,
+        V1LabelSelectorRequirement,
+        V1PodAffinityTerm,
+        V1PodAntiAffinity,
+        V1PodSpec,
+        V1ResourceRequirements,
+        V1Toleration,
+    )
+
+    resources = {
+        "cpu": worker_cpu,
+        "memory": worker_mem,
+        "nvidia.com/gpu": str(gpu_per_worker),
+    }
+
+    tolerations = [
+        V1Toleration(
+            key="nvidia.com/gpu",
+            operator="Equal",
+            value="true",
+            effect="NoSchedule",
+        )
+    ]
+
+    affinity = None
+    if separate_nodes:
+        affinity = V1Affinity(
+            pod_anti_affinity=V1PodAntiAffinity(
+                required_during_scheduling_ignored_during_execution=[
+                    V1PodAffinityTerm(
+                        label_selector=V1LabelSelector(
+                            match_expressions=[
+                                V1LabelSelectorRequirement(
+                                    key="ray.io/group",
+                                    operator="In",
+                                    values=["gpu-workers"],
+                                )
+                            ]
+                        ),
+                        topology_key="kubernetes.io/hostname",
+                    )
+                ]
+            )
+        )
+
+    worker_pod_template = PodTemplate(
+        pod_spec=V1PodSpec(
+            containers=[
+                V1Container(
+                    name="ray-worker",
+                    resources=V1ResourceRequirements(
+                        requests=resources,
+                        limits={**resources, "cpu": str(int(worker_cpu) + 1)},
+                    ),
+                )
+            ],
+            tolerations=tolerations,
+            affinity=affinity,
+        )
+    )
+
+    return RayJobConfig(
+        head_node_config=HeadNodeConfig(
+            ray_start_params={"dashboard-host": "0.0.0.0"},
+            requests=Resources(cpu=head_cpu, mem=head_mem),
+        ),
+        worker_node_config=[
+            WorkerNodeConfig(
+                group_name="gpu-workers",
+                replicas=num_workers,
+                min_replicas=num_workers,
+                max_replicas=num_workers,
+                pod_template=worker_pod_template,
+            )
+        ],
+    )
+
 
 # Define the Ray Cluster Config
 # This configures the ephemeral Ray cluster that Flyte spins up on K8s

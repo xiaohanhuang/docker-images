@@ -292,6 +292,7 @@ def fault_tolerant_distributed_task(
     pytorch_config = PyTorch(
         master=Worker(replicas=1),
         worker=Worker(replicas=num_workers),
+        increase_shared_mem=False,
     )
 
     # Pod template for EFS, GPU tolerations, and anti-affinity
@@ -378,6 +379,7 @@ def fault_tolerant_distributed_task(
         retries=retries,
         interruptible=interruptible,
         cache=False,
+        shared_memory=True,
         **kwargs,
     )
 
