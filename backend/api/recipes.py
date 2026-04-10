@@ -142,13 +142,16 @@ async def get_recipe(recipe_name: str):
     pipeline = raw.get("pipeline", {})
     steps = []
     for step in pipeline.get("steps", []):
-        steps.append(
-            {
-                "name": step.get("name", "Step"),
-                "description": step.get("description", ""),
-                "status": "ready",
-            }
-        )
+        step_data: Dict[str, Any] = {
+            "name": step.get("name", "Step"),
+            "description": step.get("description", ""),
+            "status": "ready",
+            "component": step.get("component", ""),
+            "depends_on": step.get("depends_on", []),
+            "infra": step.get("infra"),
+            "config": step.get("config", {}),
+        }
+        steps.append(step_data)
 
     # Extract profiles (presets in recipe schema)
     profiles = []

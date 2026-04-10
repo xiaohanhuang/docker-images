@@ -5,8 +5,139 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, Play, Zap, ChevronRight, Settings, Box,
   Cpu, DollarSign, Clock, AlertTriangle, Shield, Loader2,
+  X, GitBranch, Package, Link2,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api';
+
+interface StepDetail {
+  name: string;
+  description: string;
+  component: string;
+  depends_on: string[];
+  infra: string | null;
+  config: Record<string, any>;
+}
+
+function StepDetailPanel({ step, onClose }: { step: StepDetail; onClose: () => void }) {
+  const componentParts = step.component.split('.');
+  // e.g. components.data.hf_dataset_loader.hf_dataset_loader → category=data, dir=hf_dataset_loader
+  const category = componentParts.length >= 3 ? componentParts[1] : '';
+  const componentDir = componentParts.length >= 4 ? componentParts[2] : '';
+
+  const configEntries = Object.entries(step.config || {}).filter(([, v]) => v !== null);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={onClose} />
+      <div style={{
+        position: 'relative', width: 520, maxWidth: '100%',
+        backgroundColor: 'var(--bg-primary)', borderLeft: '1px solid var(--border-primary)',
+        overflowY: 'auto', padding: 24,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dimmed)', padding: 4 }}>
+            <ArrowLeft size={20} />
+          </button>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Step Details</h2>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Step Name */}
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 700 }}>{step.name}</div>
+            {step.description && (
+              <div style={{ marginTop: 8, fontSize: 14, color: 'var(--text-dimmed)' }}>{step.description}</div>
+            )}
+          </div>
+
+          {/* Component Reference */}
+          <div className="stat-card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dimmed)', textTransform: 'uppercase', marginBottom: 8, fontWeight: 600 }}>
+              <Package size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+              Component
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all', color: '#67e8f9' }}>
+              {step.component}
+            </div>
+            {category && (
+              <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                <span style={{
+                  fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                  textTransform: 'uppercase', fontWeight: 600,
+                  color: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.12)',
+                }}>{category}</span>
+                {componentDir && (
+                  <span style={{
+                    fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                    fontWeight: 500, color: 'var(--text-dimmed)',
+                    backgroundColor: 'rgba(255,255,255,0.06)',
+                  }}>{componentDir}</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Dependencies */}
+          {step.depends_on && step.depends_on.length > 0 && (
+            <div className="stat-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dimmed)', textTransform: 'uppercase', marginBottom: 8, fontWeight: 600 }}>
+                <Link2 size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                Depends On
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {step.depends_on.map(dep => (
+                  <span key={dep} style={{
+                    fontSize: 12, fontFamily: 'monospace', padding: '4px 10px', borderRadius: 6,
+                    backgroundColor: 'rgba(124,58,237,0.12)', color: '#a78bfa',
+                  }}>{dep}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Infrastructure */}
+          <div className="stat-card" style={{ padding: 16 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dimmed)', textTransform: 'uppercase', marginBottom: 8, fontWeight: 600 }}>
+              <Cpu size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+              Infrastructure
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 600 }}>
+              {step.infra || 'default (no GPU)'}
+            </div>
+          </div>
+
+          {/* Configuration */}
+          {configEntries.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-dimmed)', textTransform: 'uppercase', marginBottom: 8, fontWeight: 600 }}>
+                <Settings size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                Configuration
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                    <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-dimmed)', fontWeight: 600 }}>Key</th>
+                    <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-dimmed)', fontWeight: 600 }}>Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {configEntries.map(([key, value]) => (
+                    <tr key={key} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '6px 8px', fontFamily: 'monospace', color: '#67e8f9' }}>{key}</td>
+                      <td style={{ padding: '6px 8px', fontFamily: 'monospace', color: '#fbbf24', wordBreak: 'break-all' }}>
+                        {String(value)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function RecipeLauncherPage() {
   const params = useParams();
@@ -36,6 +167,7 @@ export default function RecipeLauncherPage() {
   const [computeType, setComputeType] = useState<'on-demand' | 'spot'>('on-demand');
   const [requirements, setRequirements] = useState('');
   const [isLaunching, setIsLaunching] = useState(false);
+  const [selectedStep, setSelectedStep] = useState<StepDetail | null>(null);
 
   // Initialize param defaults when recipe loads
   if (recipe && Object.keys(paramValues).length === 0 && r.params.length > 0) {
@@ -115,12 +247,24 @@ export default function RecipeLauncherPage() {
                       <div style={{ width: 2, height: 20, background: 'var(--accent-primary)', opacity: 0.4 }} />
                     </div>
                   )}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
-                    background: 'rgba(124,58,237,0.04)',
-                    border: '1px solid rgba(124,58,237,0.12)',
-                    borderRadius: 'var(--radius-sm)',
-                  }}>
+                  <div
+                    onClick={() => setSelectedStep(step)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+                      background: 'rgba(124,58,237,0.04)',
+                      border: '1px solid rgba(124,58,237,0.12)',
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                      e.currentTarget.style.background = 'rgba(124,58,237,0.1)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'rgba(124,58,237,0.12)';
+                      e.currentTarget.style.background = 'rgba(124,58,237,0.04)';
+                    }}
+                  >
                     <div style={{
                       width: 28, height: 28, borderRadius: '50%',
                       background: 'rgba(124,58,237,0.2)',
@@ -129,7 +273,14 @@ export default function RecipeLauncherPage() {
                     }}>{i + 1}</div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{step.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-dimmed)' }}>{step.description}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-dimmed)' }}>
+                        {step.description || (step.component ? step.component.split('.').slice(-1)[0] : '')}
+                      </div>
+                      {step.component && (
+                        <div style={{ fontSize: 11, fontFamily: 'monospace', color: 'rgba(103,232,249,0.6)', marginTop: 2 }}>
+                          {step.component}
+                        </div>
+                      )}
                     </div>
                     <ChevronRight style={{ width: 14, height: 14, color: 'var(--text-dimmed)' }} />
                   </div>
@@ -363,6 +514,10 @@ export default function RecipeLauncherPage() {
           </div>
         </div>
       </div>
+
+      {selectedStep && (
+        <StepDetailPanel step={selectedStep} onClose={() => setSelectedStep(null)} />
+      )}
     </div>
   );
 }
