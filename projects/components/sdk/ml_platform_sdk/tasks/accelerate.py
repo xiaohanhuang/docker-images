@@ -280,7 +280,7 @@ platform = Platform()
 
 def _mp_target(
     local_rank,
-    fn,
+    fn_bytes,
     strategy,
     rank_offset,
     world_size,
@@ -291,6 +291,9 @@ def _mp_target(
     kwargs,
 ):
     """Entrypoint for ``mp.spawn``. Must be at module scope to be pickleable."""
+    import cloudpickle
+
+    fn = cloudpickle.loads(fn_bytes)
     os.environ["LOCAL_RANK"] = str(local_rank)
     _worker_fn(
         fn,
@@ -476,11 +479,15 @@ def accelerate_task(
                     result_file = tmp.name
                     tmp.close()
 
+                import cloudpickle
+
+                fn_bytes = cloudpickle.dumps(fn)
+
                 try:
                     mp.spawn(
                         _mp_target,
                         args=(
-                            fn,
+                            fn_bytes,
                             strategy,
                             rank_offset,
                             total_world_size,
