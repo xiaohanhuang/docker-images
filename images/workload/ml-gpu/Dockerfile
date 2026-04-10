@@ -41,3 +41,5 @@ RUN pip install --no-cache-dir \
     sentencepiece==${SENTENCEPIECE_VERSION}
 
 WORKDIR /root
+
+# force rebuild
