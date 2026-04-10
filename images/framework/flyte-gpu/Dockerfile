@@ -36,7 +36,8 @@ RUN pip install --no-cache-dir \
 # Install ML Platform SDK — copy from read-only bind mount to writable dir first
 RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk \
     cp -r /tmp/sdk /tmp/sdk-build && \
-    pip install --no-cache-dir --ignore-installed blinker /tmp/sdk-build && \
+    rm -rf /usr/lib/python3/dist-packages/blinker* && \
+    pip install --no-cache-dir /tmp/sdk-build && \
     rm -rf /tmp/sdk-build
 
 WORKDIR /root
