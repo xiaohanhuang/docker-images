@@ -287,13 +287,15 @@ def _mp_target(
     master_addr,
     master_port,
     result_file,
-    args,
-    kwargs,
+    args_bytes,
+    kwargs_bytes,
 ):
     """Entrypoint for ``mp.spawn``. Must be at module scope to be pickleable."""
     import cloudpickle
 
     fn = cloudpickle.loads(fn_bytes)
+    args = cloudpickle.loads(args_bytes)
+    kwargs = cloudpickle.loads(kwargs_bytes)
     os.environ["LOCAL_RANK"] = str(local_rank)
     _worker_fn(
         fn,
@@ -482,6 +484,8 @@ def accelerate_task(
                 import cloudpickle
 
                 fn_bytes = cloudpickle.dumps(fn)
+                args_bytes = cloudpickle.dumps(args)
+                kwargs_bytes = cloudpickle.dumps(kwargs)
 
                 try:
                     mp.spawn(
@@ -494,8 +498,8 @@ def accelerate_task(
                             master_addr,
                             master_port,
                             result_file,
-                            args,
-                            kwargs,
+                            args_bytes,
+                            kwargs_bytes,
                         ),
                         nprocs=gpus_per_node,
                         join=True,
