@@ -33,8 +33,10 @@ RUN pip install --no-cache-dir \
     s3fs==${S3FS_VERSION} \
     requests==${REQUESTS_VERSION}
 
-# Install ML Platform SDK dynamically without leaving source layer bloat
+# Install ML Platform SDK — copy from read-only bind mount to writable dir first
 RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk \
-    pip install --no-cache-dir /tmp/sdk
+    cp -r /tmp/sdk /tmp/sdk-build && \
+    pip install --no-cache-dir /tmp/sdk-build && \
+    rm -rf /tmp/sdk-build
 
 WORKDIR /root
