@@ -40,14 +40,6 @@ hub:
 debug:
   enabled: false
 
-# Built-in pre-puller disabled — SOCI lazy-loading on Karpenter nodes
-# eliminates the need for any pre-pulling.  Containers boot in ~1 second
-# by streaming image layers on-demand from ECR.
-prePuller:
-  hook:
-    enabled: false
-  continuous:
-    enabled: false
 
 singleuser:
   serviceAccountName: singleuser

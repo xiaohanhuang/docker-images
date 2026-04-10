@@ -62,7 +62,6 @@ BUILDX := docker buildx build --platform $(PLATFORM) --load
         push-flyte-cpu push-flyte-gpu push-ray-gpu \
         push-data-cpu push-ml-gpu push-genai-gpu push-training-llm \
         push-bases push-frameworks push-workloads push-all \
-        prepull-bases prepull-frameworks \
         release tags
 
 # ── ECR login ────────────────────────────────────────────────
@@ -236,17 +235,6 @@ release: login build-all push-all
 	@echo ""
 	@echo "Released IMAGE_TAG=$(TAG) — all images pushed to ECR."
 
-# ── Pre-pull helpers (for DaemonSet / cluster bootstrap) ─────
-prepull-bases:
-	@echo "Pulling L1 base images..."
-	docker pull $(BASE_CPU_IMAGE)
-	docker pull $(BASE_GPU_IMAGE)
-
-prepull-frameworks: prepull-bases
-	@echo "Pulling L2 framework images..."
-	docker pull $(FLYTE_CPU_IMAGE)
-	docker pull $(FLYTE_GPU_IMAGE)
-	docker pull $(RAY_GPU_IMAGE)
 
 # ── Print all resolved tags (useful for CI / release notes) ──
 tags:

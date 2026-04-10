@@ -14,12 +14,11 @@
 # Parent: base-cpu       Child images: data-cpu
 # ============================================================
 
+FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/source:latest AS source
+
 ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
 ARG REPO=ml-platform
-ARG BASE_TAG=latest
-
-FROM ${REGISTRY}/${REPO}/source:latest AS source
-
+ARG BASE_TAG=py3.12-1.1.0
 FROM ${REGISTRY}/${REPO}/base-cpu:${BASE_TAG}
 
 ARG FLYTEKIT_VERSION=1.16.14
@@ -34,9 +33,7 @@ RUN pip install --no-cache-dir \
     requests==${REQUESTS_VERSION}
 
 # Install ML Platform SDK dynamically without leaving source layer bloat
-RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk-src \
-    cp -r /tmp/sdk-src /tmp/sdk && \
-    pip install --no-cache-dir /tmp/sdk && \
-    rm -rf /tmp/sdk
+RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk \
+    pip install --no-cache-dir /tmp/sdk
 
 WORKDIR /root

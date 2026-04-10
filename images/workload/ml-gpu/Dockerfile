@@ -16,7 +16,7 @@
 
 ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
 ARG REPO=ml-platform
-ARG BASE_TAG=latest
+ARG BASE_TAG=fly1.16.14-cu12.9.1-1.1.0
 FROM ${REGISTRY}/${REPO}/flyte-gpu:${BASE_TAG}
 
 # Remove distutils-installed blinker 1.4 (Ubuntu system pkg) that blocks pip uninstall

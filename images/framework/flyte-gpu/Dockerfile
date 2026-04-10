@@ -14,16 +14,12 @@
 # Parent: base-gpu-torch    Child images: ml-gpu, genai-gpu
 # ============================================================
 
+FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/source:latest AS source
+
 ARG REGISTRY=805673386114.dkr.ecr.us-west-2.amazonaws.com
 ARG REPO=ml-platform
-ARG BASE_TAG=latest
-
-FROM ${REGISTRY}/${REPO}/source:latest AS source
-
-FROM ${REGISTRY}/${REPO}/base-gpu:${BASE_TAG}
-
-# Remove distutils-installed blinker 1.4 (Ubuntu system pkg) that blocks pip uninstall
-RUN rm -rf /usr/lib/python3/dist-packages/blinker* || true
+ARG BASE_TAG=cu12.9-torch2.10-1.1.0
+FROM ${REGISTRY}/${REPO}/base-gpu-torch:${BASE_TAG}
 
 ARG FLYTEKIT_VERSION=1.16.14
 ARG BOTO3_VERSION=1.42.61
@@ -37,9 +33,7 @@ RUN pip install --no-cache-dir \
     requests==${REQUESTS_VERSION}
 
 # Install ML Platform SDK dynamically without leaving source layer bloat
-RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk-src \
-    cp -r /tmp/sdk-src /tmp/sdk && \
-    pip install --no-cache-dir /tmp/sdk && \
-    rm -rf /tmp/sdk
+RUN --mount=type=bind,from=source,source=/src/projects/components/sdk,target=/tmp/sdk \
+    pip install --no-cache-dir /tmp/sdk
 
 WORKDIR /root
