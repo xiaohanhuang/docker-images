@@ -216,6 +216,10 @@ jobs:
           platforms: linux/amd64
           push: true
           provenance: false
+          build-args: |
+            REGISTRY=${{ env.ECR_REGISTRY }}
+            REPO=ml-platform
+            BASE_TAG=latest
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-gpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-gpu:${{ github.sha }}
@@ -232,7 +236,9 @@ jobs:
           push: true
           provenance: false
           build-args: |
-            BASE_IMAGE=${{ env.ECR_REGISTRY }}/ml-platform/base-gpu-torch:latest
+            REGISTRY=${{ env.ECR_REGISTRY }}
+            REPO=ml-platform
+            BASE_TAG=latest
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/ray-worker:${{ github.sha }}
@@ -348,6 +354,10 @@ jobs:
           platforms: linux/amd64
           push: true
           provenance: false
+          build-args: |
+            REGISTRY=${{ env.ECR_REGISTRY }}
+            REPO=ml-platform
+            BASE_TAG=latest
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-cpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-cpu:${{ github.sha }}
