@@ -171,12 +171,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Ensure ECR repositories exist
-        run: |
-          for repo in base-gpu-torch executor-gpu ray-worker training-llm ml-gpu flyte-gpu flyte-cpu; do
-            aws ecr describe-repositories --repository-names "ml-platform/${repo}" 2>/dev/null || \
-              aws ecr create-repository --repository-name "ml-platform/${repo}" --image-scanning-configuration scanOnPush=true
-          done
 
       - name: Build and push base-gpu
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.base_gpu_torch == 'true'
@@ -310,12 +304,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Ensure ECR repositories exist
-        run: |
-          for repo in base-cpu executor-cpu; do
-            aws ecr describe-repositories --repository-names "ml-platform/${repo}" 2>/dev/null || \
-              aws ecr create-repository --repository-name "ml-platform/${repo}" --image-scanning-configuration scanOnPush=true
-          done
 
       - name: Build and push base-cpu
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.base_cpu == 'true'
@@ -391,12 +379,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Ensure ECR repositories exist
-        run: |
-          for repo in desk-cpu notebook-marimo desk-gpu gpu-idle-monitor spark-base text2sql-serve workflow-cpu workflow-gpu remote-agent backend-api; do
-            aws ecr describe-repositories --repository-names "ml-platform/${repo}" 2>/dev/null || \
-              aws ecr create-repository --repository-name "ml-platform/${repo}" --image-scanning-configuration scanOnPush=true
-          done
 
       - name: Build and push desk-cpu
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_cpu == 'true'
