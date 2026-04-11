@@ -52,7 +52,7 @@ singleuser:
     JUPYTER_SERVER_PROXY_URL: "127.0.0.1:8888"
   # Default notebook server image (no GPU)
   image:
-    name: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/desk-gpu
+    name: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo-vscode
     tag: e718bb3bea005ea88e23813e44e495ad175681af
     pullPolicy: IfNotPresent
   defaultUrl: /lab
@@ -108,7 +108,7 @@ singleuser:
     - display_name: "GPU - Shared A10G (1/4 GPU, shared VRAM, 4GB RAM)"
       description: "1/4 NVIDIA A10G via time-slicing - Shared for prototyping. Note: VRAM is NOT hardware-isolated (time-slicing shares the full 24GB GPU). Best for light workloads."
       kubespawner_override:
-        image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/desk-gpu:e718bb3bea005ea88e23813e44e495ad175681af
+        image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo-vscode:e718bb3bea005ea88e23813e44e495ad175681af
         image_pull_policy: IfNotPresent
         cpu_limit: 1
         cpu_guarantee: 0.5
@@ -160,7 +160,7 @@ singleuser:
     - display_name: "GPU - Single A10G (4 CPU, 24GB VRAM, 16GB RAM)"
       description: "1x NVIDIA A10G (g5.xlarge) - Cost Effective"
       kubespawner_override:
-        image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/desk-gpu:e718bb3bea005ea88e23813e44e495ad175681af
+        image: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/notebook-marimo-vscode:e718bb3bea005ea88e23813e44e495ad175681af
         image_pull_policy: IfNotPresent
         cpu_limit: 4
         cpu_guarantee: 2

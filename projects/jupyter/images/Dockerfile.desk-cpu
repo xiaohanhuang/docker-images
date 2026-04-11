@@ -1,6 +1,6 @@
-# desk-cpu — Unified CPU desk image with Jupyter + Marimo + VS Code
+# notebook-cpu — Unified CPU desk image with Jupyter + Marimo + VS Code
 #
-# This is the CPU counterpart to desk-gpu (Dockerfile.marimo.vscode).
+# This is the CPU counterpart to notebook-marimo-vscode (Dockerfile.marimo.vscode).
 # Same three IDEs, same developer experience — just no CUDA/PyTorch GPU support.
 #
 # Base: quay.io/jupyter/scipy-notebook (CPU-only, no CUDA)

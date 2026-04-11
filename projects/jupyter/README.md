@@ -39,7 +39,7 @@ after spawning any profile. See [VSCODE_SERVER.md](VSCODE_SERVER.md) for details
 | GPU - Single A10G High-Mem | 1 GPU, 24GB VRAM, 128GB RAM | Heavy data loading with GPU |
 | GPU - 4x NVIDIA A10G | 4 GPUs, 96GB VRAM, 192GB RAM | Distributed training |
 
-All profiles use the `desk-gpu` image which includes JupyterLab,
+All profiles use the `notebook-marimo-vscode` image which includes JupyterLab,
 Marimo, and VS Code Server.
 
 ## Key Features

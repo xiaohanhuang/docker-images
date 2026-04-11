@@ -1,4 +1,4 @@
-# CPU-only requirements for desk-cpu image
+# CPU-only requirements for notebook-cpu image
 # Same as the full requirements but without GPU-specific packages (torch, nvitop, etc.)
 
 # ML (CPU-only)

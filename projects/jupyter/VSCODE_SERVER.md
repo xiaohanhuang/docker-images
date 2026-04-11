@@ -21,7 +21,7 @@ JupyterHub's authentication layer.
 ```
 quay.io/jupyter/pytorch-notebook:python-3.12           (base)
   └─ notebook-marimo:<sha>                              (adds Marimo + SDK)
-       └─ desk-gpu:<sha>                  (adds code-server v4.111.0 + vscode_proxy)
+       └─ notebook-marimo-vscode:<sha>                  (adds code-server v4.111.0 + vscode_proxy)
 ```
 
 Images are tagged with the Git commit SHA of the `docker-images` repo and pinned
@@ -50,7 +50,7 @@ make build-vscode
 # Production builds happen via CI in the docker-images repo
 ```
 
-The ECR image is `ml-platform/desk-gpu`.
+The ECR image is `ml-platform/notebook-marimo-vscode`.
 
 ## GPU Idle Monitoring
 

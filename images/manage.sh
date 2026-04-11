@@ -16,11 +16,11 @@ REGION="us-west-2"
 
 # All ECR image names managed by this tool
 ALL_IMAGES=(
-  base-cpu base-gpu-torch
+  base-cpu base-gpu
   flyte-cpu flyte-gpu ray-gpu
   data-cpu ml-gpu genai-gpu training-llm
-  executor-gpu executor-cpu
-  desk-cpu notebook-marimo desk-gpu
+  executor-pool executor-pool-cpu
+  notebook-cpu notebook-marimo notebook-marimo-vscode
   gpu-idle-monitor spark-base
   backend-api dashboard
   execution-service registry-service
