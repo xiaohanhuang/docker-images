@@ -377,7 +377,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push notebook-cpu
+      - name: Build and push desk-cpu
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_cpu == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -387,8 +387,8 @@ jobs:
           push: true
           provenance: false
           tags: |
-            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:latest
-            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/ml-platform/desk-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/desk-cpu:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -407,7 +407,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push notebook-marimo-vscode
+      - name: Build and push desk-gpu
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo_vscode == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -417,8 +417,8 @@ jobs:
           push: true
           provenance: false
           tags: |
-            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo-vscode:latest
-            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo-vscode:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/ml-platform/desk-gpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/desk-gpu:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

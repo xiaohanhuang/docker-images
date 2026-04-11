@@ -40,7 +40,7 @@ class DeskSpec(BaseModel):
     """Specification for launching a new desk."""
 
     name: str
-    image: str = "ml-platform/notebook-marimo-vscode:1.0.0"
+    image: str = "ml-platform/desk-gpu:1.0.0"
     gpu_type: str = "CPU"
     gpu_count: int = 0
     cpu_count: int = 4

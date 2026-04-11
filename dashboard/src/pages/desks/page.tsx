@@ -16,7 +16,7 @@ function NewDeskModal({ open, onClose, onLaunch, isLaunching }: {
   isLaunching: boolean;
 }) {
   const [name, setName] = useState('');
-  const [image, setImage] = useState('ml-platform/notebook-marimo-vscode:1.0.0');
+  const [image, setImage] = useState('ml-platform/desk-gpu:1.0.0');
   const [gpuType, setGpuType] = useState('CPU');
   const [gpuCount, setGpuCount] = useState(0.25); // Set default to 1/4 GPU
   const [cpuCount, setCpuCount] = useState(4);
@@ -34,7 +34,7 @@ function NewDeskModal({ open, onClose, onLaunch, isLaunching }: {
     { type: 'A100', instance: 'p4d',   ratePerGpu: 4.10,   validGpus: [0.25, 0.5, 1, 2, 4, 8] },
     { type: 'H100', instance: 'p5',    ratePerGpu: 6.88,   validGpus: [0.25, 0.5, 1, 2, 4, 8] },
   ];
-  const images = ['ml-platform/notebook-marimo-vscode:1.0.0', 'ml-platform/base-cpu:1.1.0', 'ml-platform/notebook-cpu:1.0.0', 'ml-platform/base-gpu:1.1.0', 'ml-platform/training-llm:1.1.0'];
+  const images = ['ml-platform/desk-gpu:1.0.0', 'ml-platform/base-cpu:1.1.0', 'ml-platform/desk-cpu:1.0.0', 'ml-platform/base-gpu:1.1.0', 'ml-platform/training-llm:1.1.0'];
   const selected = gpuOptions.find(o => o.type === gpuType) || gpuOptions[0];
   const hourly = selected.validGpus.length === 0 ? selected.ratePerGpu * cpuCount : selected.ratePerGpu * gpuCount;
   const isGpu = selected.validGpus.length > 0;

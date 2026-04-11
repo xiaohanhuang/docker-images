@@ -20,7 +20,7 @@ ALL_IMAGES=(
   flyte-cpu flyte-gpu ray-gpu
   data-cpu ml-gpu genai-gpu training-llm
   executor-gpu executor-cpu
-  notebook-cpu notebook-marimo notebook-marimo-vscode
+  desk-cpu notebook-marimo desk-gpu
   gpu-idle-monitor spark-base
   backend-api dashboard
   execution-service registry-service

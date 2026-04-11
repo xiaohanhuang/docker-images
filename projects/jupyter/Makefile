@@ -32,7 +32,7 @@ build-images:
 	docker build -t ml-platform/notebook-gpu:1.0.0 -f images/Dockerfile.gpu ../../
 
 build-vscode:
-	docker build -t ml-platform/notebook-marimo-vscode:1.0.0 -f images/Dockerfile.marimo.vscode ../../
+	docker build -t ml-platform/desk-gpu:1.0.0 -f images/Dockerfile.marimo.vscode ../../
 
 build-monitor:
 	docker build -t ml-platform/gpu-idle-monitor:1.0.0 gpu-idle-monitor/
