@@ -382,7 +382,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: projects/jupyter/images/Dockerfile
+          file: projects/jupyter/images/Dockerfile.desk-cpu
           platforms: linux/amd64
           push: true
           provenance: false
