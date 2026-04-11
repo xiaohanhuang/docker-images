@@ -12,6 +12,7 @@ hub:
       admin_users:
         - xiaohan
     JupyterHub:
+      base_url: /jupyter
       # WARNING: DummyAuthenticator is intended for local development/testing only.
       # Configure a secure OAuth (or other production-ready) authenticator for real deployments.
       authenticator_class: dummy
@@ -328,11 +329,17 @@ singleuser:
 
 proxy:
   service:
-    type: LoadBalancer
+    type: ClusterIP
   chp:
     nodeSelector:
       role: system
 
 scheduling:
   userScheduler:
+    enabled: false
+
+prePuller:
+  hook:
+    enabled: false
+  continuous:
     enabled: false
