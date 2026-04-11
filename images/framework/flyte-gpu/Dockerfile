@@ -20,7 +20,7 @@ ARG BASE_TAG=cu12.9-torch2.10-1.1.0
 
 FROM 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform/source:latest AS source
 
-FROM ${REGISTRY}/${REPO}/base-gpu:${BASE_TAG}
+FROM ${REGISTRY}/${REPO}/base-gpu-torch:${BASE_TAG}
 
 ARG FLYTEKIT_VERSION=1.16.14
 ARG BOTO3_VERSION=1.42.61
