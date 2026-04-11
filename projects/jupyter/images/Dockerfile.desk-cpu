@@ -1,0 +1,66 @@
+# desk-cpu — Unified CPU desk image with Jupyter + Marimo + VS Code
+#
+# This is the CPU counterpart to desk-gpu (Dockerfile.marimo.vscode).
+# Same three IDEs, same developer experience — just no CUDA/PyTorch GPU support.
+#
+# Base: quay.io/jupyter/scipy-notebook (CPU-only, no CUDA)
+# Tools: JupyterLab, Marimo, code-server (VS Code)
+FROM quay.io/jupyter/scipy-notebook:python-3.12
+
+USER root
+
+# Install system deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    vim \
+    htop \
+    screen \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install code-server (pinned version for reproducibility)
+RUN curl -fsSL https://code-server.dev/install.sh | sh -s -- --version 4.111.0
+
+USER ${NB_UID}
+
+# Install platform packages (minus GPU-specific ones like torch-tb-profiler)
+COPY projects/jupyter/images/requirements-cpu.txt /tmp/requirements-cpu.txt
+RUN pip install --no-cache-dir -r /tmp/requirements-cpu.txt
+
+# Install Marimo + jupyter-server-proxy for multi-tool support
+RUN pip install --no-cache-dir marimo jupyter-server-proxy
+
+# Marimo proxy entry (registers Marimo in JupyterLab launcher)
+COPY --chown=${NB_UID}:${NB_GID} projects/jupyter/images/marimo_proxy /opt/marimo-proxy/
+RUN pip install --no-cache-dir --no-deps /opt/marimo-proxy/
+
+# Install Continue AI coding extension (auto-complete & chat via Bedrock)
+RUN code-server --install-extension Continue.continue
+
+# Pre-configure Continue with AWS Bedrock (Claude 3.5 Sonnet)
+# Pods inherit IAM credentials via IRSA — no hardcoded keys needed.
+RUN mkdir -p /home/jovyan/.continue && \
+    cat > /home/jovyan/.continue/config.yaml << 'EOF'
+models:
+  - name: "Claude 3.5 Sonnet"
+    provider: bedrock
+    model: anthropic.claude-3-5-sonnet-20241022-v2:0
+    env:
+      region: us-west-2
+tabAutocompleteModel:
+  name: "Claude 3.5 Haiku"
+  provider: bedrock
+  model: anthropic.claude-3-5-haiku-20241022-v1:0
+  env:
+    region: us-west-2
+EOF
+
+# VS Code proxy entry (registers VS Code in JupyterLab launcher)
+COPY --chown=${NB_UID}:${NB_GID} projects/jupyter/images/vscode_proxy /opt/vscode-proxy/
+RUN pip install --no-cache-dir --no-deps /opt/vscode-proxy/
+
+# Platform SDK
+COPY --chown=${NB_UID}:${NB_GID} projects/components/sdk /opt/ml-platform-sdk/
+RUN pip install --no-cache-dir --no-deps -e /opt/ml-platform-sdk/
+
+EXPOSE 8888

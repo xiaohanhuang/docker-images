@@ -1,0 +1,27 @@
+# CPU-only requirements for desk-cpu image
+# Same as the full requirements but without GPU-specific packages (torch, nvitop, etc.)
+
+# ML (CPU-only)
+transformers==4.41.2
+datasets==2.21.0
+peft==0.11.1
+accelerate==0.31.0
+
+# Distributed & Orchestration
+ray[default]==2.54.0
+flytekit==1.13.0
+flytekitplugins-ray==1.13.0
+mlflow==2.14.0
+
+# Shared lower-level deps (Anti-Conflict Pins)
+pydantic>=2.12.0,<3
+pyarrow==15.0.0
+fsspec==2024.6.1
+adlfs==2024.4.1
+gcsfs>=2024.6.0
+s3fs>=2024.6.0
+
+# Data & Utils
+boto3<1.35.0
+jupyterlab-git
+ipywidgets

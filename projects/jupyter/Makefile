@@ -34,6 +34,9 @@ build-images:
 build-vscode:
 	docker build -t ml-platform/desk-gpu:1.0.0 -f images/Dockerfile.marimo.vscode ../../
 
+build-desk-cpu:
+	docker build -t ml-platform/desk-cpu:1.0.0 -f images/Dockerfile.desk-cpu ../../
+
 build-monitor:
 	docker build -t ml-platform/gpu-idle-monitor:1.0.0 gpu-idle-monitor/
 
