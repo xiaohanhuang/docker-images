@@ -17,6 +17,9 @@ COPY --from=source /src/projects/components/sdk/ml_platform_sdk/ /app/projects/c
 COPY --from=source /src/projects/components/components/ /app/projects/components/components/
 COPY --from=source /src/projects/recipes/ /app/projects/recipes/
 
+# Override backend from workspace (may be newer than source image)
+COPY backend/ /app/backend/
+
 # Install backend dependencies using uv
 RUN uv pip install --no-cache --system ".[backend]"
 
