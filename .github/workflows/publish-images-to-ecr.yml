@@ -406,11 +406,14 @@ jobs:
 
       - name: Create SOCI index for notebook-cpu
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_cpu == 'true'
-        uses: awslabs/soci-github-action@v1
-        with:
-          registry: ${{ env.ECR_REGISTRY }}
-          repository: ml-platform/notebook-cpu
-          image-tag: latest
+        run: |
+          set -eux
+          SOCI_VERSION=0.8.0
+          curl -sSL https://github.com/awslabs/soci-snapshotter/releases/download/v${SOCI_VERSION}/soci-snapshotter-${SOCI_VERSION}-linux-amd64.tar.gz | sudo tar -xz -C /usr/local/bin soci
+          IMAGE="${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:latest"
+          sudo ctr image pull --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
+          sudo soci create "$IMAGE"
+          sudo soci push --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
 
       - name: Build and push notebook-marimo
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo == 'true'
@@ -429,11 +432,13 @@ jobs:
 
       - name: Create SOCI index for notebook-marimo
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo == 'true'
-        uses: awslabs/soci-github-action@v1
-        with:
-          registry: ${{ env.ECR_REGISTRY }}
-          repository: ml-platform/notebook-marimo
-          image-tag: latest
+        run: |
+          set -eux
+          which soci || { SOCI_VERSION=0.8.0; curl -sSL https://github.com/awslabs/soci-snapshotter/releases/download/v${SOCI_VERSION}/soci-snapshotter-${SOCI_VERSION}-linux-amd64.tar.gz | sudo tar -xz -C /usr/local/bin soci; }
+          IMAGE="${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo:latest"
+          sudo ctr image pull --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
+          sudo soci create "$IMAGE"
+          sudo soci push --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
 
       - name: Build and push notebook-marimo-vscode
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo_vscode == 'true'
@@ -452,11 +457,13 @@ jobs:
 
       - name: Create SOCI index for notebook-marimo-vscode
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo_vscode == 'true'
-        uses: awslabs/soci-github-action@v1
-        with:
-          registry: ${{ env.ECR_REGISTRY }}
-          repository: ml-platform/notebook-marimo-vscode
-          image-tag: latest
+        run: |
+          set -eux
+          which soci || { SOCI_VERSION=0.8.0; curl -sSL https://github.com/awslabs/soci-snapshotter/releases/download/v${SOCI_VERSION}/soci-snapshotter-${SOCI_VERSION}-linux-amd64.tar.gz | sudo tar -xz -C /usr/local/bin soci; }
+          IMAGE="${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo-vscode:latest"
+          sudo ctr image pull --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
+          sudo soci create "$IMAGE"
+          sudo soci push --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
 
       - name: Build and push gpu-idle-monitor
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.gpu_idle_monitor == 'true'
