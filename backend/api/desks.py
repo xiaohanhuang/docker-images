@@ -6,7 +6,6 @@ that scientists use for development, debugging, and experimentation.
 Uses the kubernetes Python client for reliable local/in-cluster connectivity.
 """
 
-import asyncio
 import datetime
 import logging
 import os
@@ -40,7 +39,7 @@ class DeskSpec(BaseModel):
     """Specification for launching a new desk."""
 
     name: str
-    image: str = "ml-platform/desk-gpu:1.0.0"
+    image: str = ""  # auto-selected based on gpu_type
     gpu_type: str = "CPU"
     gpu_count: int = 0
     cpu_count: int = 4
@@ -76,7 +75,7 @@ def _format_uptime(created_at: datetime.datetime | None) -> str:
 
 
 @router.get("/pricing")
-async def get_pricing() -> dict[str, Any]:
+def get_pricing() -> dict[str, Any]:
     """Return AWS on-demand pricing for desk instance types."""
     options = []
     for gpu_type, info in GPU_TYPE_PRICING.items():
@@ -93,7 +92,7 @@ async def get_pricing() -> dict[str, Any]:
 
 
 @router.get("")
-async def list_desks(user: str | None = None) -> dict[str, Any]:
+def list_desks(user: str | None = None) -> dict[str, Any]:
     """
     List all active desks (interactive pods) with cost metadata.
 
@@ -115,6 +114,17 @@ async def list_desks(user: str | None = None) -> dict[str, Any]:
             _request_timeout=10,
         )
 
+        pvc_label_selector = "ml-platform/type=desk-home"
+        if user:
+            pvc_label_selector += f",ml-platform/user={user}"
+
+        pvcs = v1.list_namespaced_persistent_volume_claim(
+            namespace=DESK_NAMESPACE,
+            label_selector=pvc_label_selector,
+            _request_timeout=10,
+        )
+
+        active_desk_names = set()
         desks = []
         for pod in pods.items:
             metadata = pod.metadata
@@ -166,6 +176,38 @@ async def list_desks(user: str | None = None) -> dict[str, Any]:
                     created_at=created_at.isoformat() if created_at else None,
                 )
             )
+            active_desk_names.add(metadata.name)
+
+        # Add "Stopped" desks from PVCs that have no running pod
+        for pvc in pvcs.items:
+            # remove "-home" suffix
+            pvc_name = pvc.metadata.name
+            if not pvc_name.endswith("-home"):
+                continue
+
+            desk_id = pvc_name[:-5]
+            if desk_id in active_desk_names:
+                continue
+
+            created_at = pvc.metadata.creation_timestamp
+            labels = pvc.metadata.labels or {}
+            user_label = labels.get("ml-platform/user", "unknown")
+
+            desks.append(
+                DeskInfo(
+                    id=desk_id,
+                    name=desk_id.replace("desk-", ""),
+                    status="Stopped",
+                    gpu="—",
+                    cpu_count=0,
+                    memory="—",
+                    uptime="—",
+                    burn_rate="0.0",
+                    image="—",
+                    user=user_label,
+                    created_at=created_at.isoformat() if created_at else None,
+                )
+            )
 
         return {"desks": desks, "count": len(desks)}
 
@@ -177,17 +219,27 @@ async def list_desks(user: str | None = None) -> dict[str, Any]:
 def _build_pod_manifest(spec: DeskSpec, pod_name: str, user: str) -> "client.V1Pod":
     # Resolve full image path
     image = spec.image
-    if "/" not in image or image.startswith("ml-platform/"):
+    if not image:
+        image = "ml-platform/desk-gpu:latest"
+    if "/" not in image:
+        image = f"ml-platform/{image}"
+    if image.startswith("ml-platform/"):
         image = f"{ECR_REGISTRY.rstrip('/')}/{image}"
 
+    if ":" not in image.split("/")[-1]:
+        image = f"{image}:latest"
+
     # Build container resources
-    resources: dict = {
-        "requests": {"cpu": str(spec.cpu_count), "memory": spec.memory},
-        "limits": {"cpu": str(spec.cpu_count), "memory": spec.memory},
-    }
     if spec.gpu_count > 0:
-        resources["requests"]["nvidia.com/gpu"] = str(spec.gpu_count)
-        resources["limits"]["nvidia.com/gpu"] = str(spec.gpu_count)
+        resources: dict = {
+            "requests": {"nvidia.com/gpu": str(spec.gpu_count)},
+            "limits": {"nvidia.com/gpu": str(spec.gpu_count)},
+        }
+    else:
+        resources: dict = {
+            "requests": {"cpu": str(spec.cpu_count), "memory": spec.memory},
+            "limits": {"cpu": str(spec.cpu_count), "memory": spec.memory},
+        }
 
     # Node selector — for GPU types we need the specific GPU node,
     # for CPU we let Karpenter auto-provision the best-fit instance
@@ -213,35 +265,62 @@ def _build_pod_manifest(spec: DeskSpec, pod_name: str, user: str) -> "client.V1P
         ),
         spec=client.V1PodSpec(
             restart_policy="Never",
+            security_context=client.V1PodSecurityContext(fs_group=100),
             node_selector=node_selector if node_selector else None,
+            init_containers=[
+                client.V1Container(
+                    name="volume-mount-hack",
+                    image="alpine",
+                    command=["sh", "-c", f"chown -R 1000:100 /home/{user}"],
+                    volume_mounts=[
+                        client.V1VolumeMount(name="desk-home", mount_path=f"/home/{user}")
+                    ],
+                )
+            ],
             containers=[
                 client.V1Container(
                     name="main",
                     image=image,
-                    # Start all IDE tools alongside the default entrypoint
+                    security_context=client.V1SecurityContext(run_as_user=0),
                     command=["sh", "-c"],
                     args=[
-                        "code-server --port 9000 --auth none --bind-addr 0.0.0.0:9000 "
-                        "--disable-getting-started-override /home/jovyan "
-                        "> /tmp/code-server.log 2>&1 & "
-                        "mkdir -p /home/jovyan/.config/marimo && "
-                        "echo '[display]' > /home/jovyan/.config/marimo/marimo.toml && "
-                        "echo 'theme = \"dark\"' >> /home/jovyan/.config/marimo/marimo.toml && "
-                        "echo '[tool.marimo.display]' > /home/jovyan/pyproject.toml && "
-                        "echo 'theme = \"dark\"' >> /home/jovyan/pyproject.toml && "
-                        "marimo edit --host 0.0.0.0 --port 2718 --headless --no-token "
+                        # 1. Rename the jovyan user to the actual user
+                        f"usermod -l {user} -d /home/{user} jovyan || true; "
+                        f"groupmod -n {user} jovyan || true; "
+                        # 2. Copy skeleton files to the persistent /home/{user} if missing
+                        f"if [ ! -f /home/{user}/.bashrc ]; then "
+                        f"cp -a /home/jovyan/. /home/{user}/ 2>/dev/null || true; "
+                        f"chown -R 1000:100 /home/{user}; fi; "
+                        # 3. Setup Marimo configuration
+                        f"mkdir -p /home/{user}/.config/marimo && "
+                        f"echo '[display]' > /home/{user}/.config/marimo/marimo.toml && "
+                        f"echo 'theme = \"dark\"' >> /home/{user}/.config/marimo/marimo.toml && "
+                        f"echo '[tool.marimo.display]' > /home/{user}/pyproject.toml && "
+                        f"echo 'theme = \"dark\"' >> /home/{user}/pyproject.toml && "
+                        f"chown -R 1000:100 /home/{user} && "
+                        # 4. Step down to the actual user to run all processes
+                        # NOTE: non-login `su` strips PATH — we must explicitly re-export
+                        # /opt/conda/bin so that python3, jupyter, marimo etc. are found.
+                        f"exec su {user} -s /bin/bash -c '"
+                        f"export PATH=/opt/conda/bin:/usr/local/bin:/usr/bin:/bin:$PATH; "
+                        f"code-server --port 9000 --auth none --bind-addr 0.0.0.0:9000 "
+                        f"--user-data-dir /home/{user}/.local/share/code-server "
+                        f"--disable-getting-started-override /home/{user} "
+                        f"> /tmp/code-server.log 2>&1 & "
+                        f"marimo edit --host 0.0.0.0 --port 2718 --headless --no-token "
                         f"--base-url /desk-marimo/{pod_name} "
-                        "--allow-origins '*' --no-skew-protection "
-                        "> /tmp/marimo.log 2>&1 & "
-                        "exec start-notebook.py "
-                        "--IdentityProvider.token='' "
-                        "--ServerApp.disable_check_xsrf=True "
-                        "--ServerApp.allow_origin='*' "
-                        "--ServerApp.tornado_settings="
-                        "\"{'headers':{'Content-Security-Policy':"
-                        "'frame-ancestors *'}}\" "
+                        f'--allow-origins "*" --no-skew-protection '
+                        f"> /tmp/marimo.log 2>&1 & "
+                        f"python3 -m jupyter lab "
+                        f'--IdentityProvider.token="" '
+                        f"--ServerApp.disable_check_xsrf=True "
+                        f'--ServerApp.allow_origin="*" '
+                        f"--ServerApp.tornado_settings="
+                        f'"{{\\"headers\\":{{\\"Content-Security-Policy\\":'
+                        f'\\"frame-ancestors *\\"}}}}" '
                         f"--ServerApp.base_url="
-                        f"/desk-jupyter/{pod_name}/"
+                        f"/desk-jupyter/{pod_name}/ "
+                        f"'"
                     ],
                     resources=client.V1ResourceRequirements(**resources),
                     ports=[
@@ -255,11 +334,16 @@ def _build_pod_manifest(spec: DeskSpec, pod_name: str, user: str) -> "client.V1P
                             name="efs-storage",
                             mount_path="/shared",
                         ),
+                        client.V1VolumeMount(
+                            name="desk-home",
+                            mount_path=f"/home/{user}",
+                        ),
                     ],
                     env=[
                         client.V1EnvVar(name="ML_PLAT_USER", value=user),
                         client.V1EnvVar(name="ML_PLAT_DESK", value=pod_name),
                         client.V1EnvVar(name="JUPYTER_TOKEN", value=""),
+                        client.V1EnvVar(name="HOME", value=f"/home/{user}"),
                     ],
                 ),
             ],
@@ -270,6 +354,12 @@ def _build_pod_manifest(spec: DeskSpec, pod_name: str, user: str) -> "client.V1P
                         claim_name="efs-claim",
                     ),
                 ),
+                client.V1Volume(
+                    name="desk-home",
+                    persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
+                        claim_name=f"{pod_name}-home",
+                    ),
+                ),
             ],
         ),
     )
@@ -277,7 +367,7 @@ def _build_pod_manifest(spec: DeskSpec, pod_name: str, user: str) -> "client.V1P
 
 
 @router.post("")
-async def launch_desk(spec: DeskSpec, request: Request) -> dict[str, str]:
+def launch_desk(spec: DeskSpec, request: Request) -> dict[str, str]:
     """
     Launch a new desk (interactive GPU workspace).
 
@@ -301,11 +391,171 @@ async def launch_desk(spec: DeskSpec, request: Request) -> dict[str, str]:
 
     try:
         v1 = get_core_v1()
-        v1.create_namespaced_pod(
-            namespace=DESK_NAMESPACE,
-            body=pod_manifest,
-            _request_timeout=15,
+        import time
+
+        # 0. Ensure per-desk EBS PVC exists (idempotent — survives hardware switches)
+        #    Follows JupyterHub named-server convention: one PVC per desk
+        #    (like claim-user--servername).
+        #    See: projects/jupyter/helm-values.yaml storage.type=dynamic
+        pvc_name = f"{pod_name}-home"
+        try:
+            v1.read_namespaced_persistent_volume_claim(name=pvc_name, namespace=DESK_NAMESPACE)
+            logger.info(f"Reusing existing PVC {pvc_name}")
+        except client.ApiException as e:
+            if e.status == 404:
+                pvc = client.V1PersistentVolumeClaim(
+                    metadata=client.V1ObjectMeta(
+                        name=pvc_name,
+                        namespace=DESK_NAMESPACE,
+                        labels={
+                            "ml-platform/type": "desk-home",
+                            "ml-platform/user": user,
+                        },
+                    ),
+                    spec=client.V1PersistentVolumeClaimSpec(
+                        access_modes=["ReadWriteOnce"],
+                        storage_class_name="gp3",
+                        resources=client.V1VolumeResourceRequirements(
+                            requests={"storage": "50Gi"},
+                        ),
+                    ),
+                )
+                v1.create_namespaced_persistent_volume_claim(namespace=DESK_NAMESPACE, body=pvc)
+                logger.info(f"Created new PVC {pvc_name}")
+            else:
+                raise e
+
+        # 1. Create Pod with robust conflict retry waiting for graceful terminations
+        for attempt in range(25):
+            try:
+                v1.create_namespaced_pod(
+                    namespace=DESK_NAMESPACE,
+                    body=pod_manifest,
+                    _request_timeout=5,
+                )
+                break
+            except client.ApiException as e:
+                if e.status == 409:
+                    if attempt == 24:
+                        raise e
+                    time.sleep(2.0)
+                else:
+                    raise e
+        # ----------------------------------------------------
+        # Traefik Routing Setup (idempotent — delete-then-create)
+        # ----------------------------------------------------
+        svc_manifest = client.V1Service(
+            api_version="v1",
+            kind="Service",
+            metadata=client.V1ObjectMeta(
+                name=pod_name,
+                namespace=DESK_NAMESPACE,
+                labels={"ml-platform/desk-name": spec.name},
+            ),
+            spec=client.V1ServiceSpec(
+                selector={"ml-platform/desk-name": spec.name},
+                ports=[
+                    client.V1ServicePort(name="vscode", port=9000, target_port=9000),
+                    client.V1ServicePort(name="marimo", port=2718, target_port=2718),
+                    client.V1ServicePort(name="jupyter", port=8888, target_port=8888),
+                ],
+            ),
         )
+        try:
+            v1.delete_namespaced_service(name=pod_name, namespace=DESK_NAMESPACE)
+        except Exception:
+            pass
+        v1.create_namespaced_service(namespace=DESK_NAMESPACE, body=svc_manifest)
+
+        from backend.k8s import get_custom_objects, get_networking_v1
+
+        custom_api = get_custom_objects()
+        middleware_name = f"strip-{pod_name}"
+        mw_manifest = {
+            "apiVersion": "traefik.io/v1alpha1",
+            "kind": "Middleware",
+            "metadata": {"name": middleware_name, "namespace": DESK_NAMESPACE},
+            "spec": {"stripPrefix": {"prefixes": [f"/desk-proxy/{pod_name}"]}},
+        }
+        try:
+            custom_api.delete_namespaced_custom_object(
+                group="traefik.io",
+                version="v1alpha1",
+                namespace=DESK_NAMESPACE,
+                plural="middlewares",
+                name=middleware_name,
+            )
+        except Exception:
+            pass
+        custom_api.create_namespaced_custom_object(
+            group="traefik.io",
+            version="v1alpha1",
+            namespace=DESK_NAMESPACE,
+            plural="middlewares",
+            body=mw_manifest,
+        )
+
+        networking_v1 = get_networking_v1()
+        ingress_manifest = client.V1Ingress(
+            api_version="networking.k8s.io/v1",
+            kind="Ingress",
+            metadata=client.V1ObjectMeta(
+                name=pod_name,
+                namespace=DESK_NAMESPACE,
+                annotations={
+                    "traefik.ingress.kubernetes.io/router.middlewares": (
+                        f"{DESK_NAMESPACE}-{middleware_name}@kubernetescrd"
+                    )
+                },
+            ),
+            spec=client.V1IngressSpec(
+                ingress_class_name="traefik",
+                rules=[
+                    client.V1IngressRule(
+                        http=client.V1HTTPIngressRuleValue(
+                            paths=[
+                                client.V1HTTPIngressPath(
+                                    path=f"/desk-proxy/{pod_name}",
+                                    path_type="Prefix",
+                                    backend=client.V1IngressBackend(
+                                        service=client.V1IngressServiceBackend(
+                                            name=pod_name,
+                                            port=client.V1ServiceBackendPort(number=9000),
+                                        )
+                                    ),
+                                ),
+                                client.V1HTTPIngressPath(
+                                    path=f"/desk-marimo/{pod_name}",
+                                    path_type="Prefix",
+                                    backend=client.V1IngressBackend(
+                                        service=client.V1IngressServiceBackend(
+                                            name=pod_name,
+                                            port=client.V1ServiceBackendPort(number=2718),
+                                        )
+                                    ),
+                                ),
+                                client.V1HTTPIngressPath(
+                                    path=f"/desk-jupyter/{pod_name}",
+                                    path_type="Prefix",
+                                    backend=client.V1IngressBackend(
+                                        service=client.V1IngressServiceBackend(
+                                            name=pod_name,
+                                            port=client.V1ServiceBackendPort(number=8888),
+                                        )
+                                    ),
+                                ),
+                            ]
+                        )
+                    )
+                ],
+            ),
+        )
+        try:
+            networking_v1.delete_namespaced_ingress(name=pod_name, namespace=DESK_NAMESPACE)
+        except Exception:
+            pass
+        networking_v1.create_namespaced_ingress(namespace=DESK_NAMESPACE, body=ingress_manifest)
+
         logger.info(f"Desk created: {pod_name} ({spec.gpu_type} x{spec.gpu_count})")
         return {
             "status": "created",
@@ -314,22 +564,60 @@ async def launch_desk(spec: DeskSpec, request: Request) -> dict[str, str]:
         }
     except Exception as e:
         logger.error(f"Failed to create desk {pod_name}: {e}")
+        # Best-effort cleanup on failure
+        try:
+            v1.delete_namespaced_pod(name=pod_name, namespace=DESK_NAMESPACE)
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Failed to create desk: {e}")
 
 
 @router.delete("/{desk_id}")
-async def stop_desk(desk_id: str) -> dict[str, str]:
+def stop_desk(desk_id: str, purge: bool = False) -> dict[str, str]:
     """Stop and remove a desk."""
     if not k8s_available():
         raise HTTPException(status_code=503, detail="kubernetes package not installed")
 
     try:
         v1 = get_core_v1()
-        v1.delete_namespaced_pod(name=desk_id, namespace=DESK_NAMESPACE)
-        return {"status": "stopped", "desk_id": desk_id, "message": "EFS volume preserved"}
+        v1.delete_namespaced_pod(
+            name=desk_id,
+            namespace=DESK_NAMESPACE,
+            body=client.V1DeleteOptions(propagation_policy="Background"),
+        )
+        
+        if purge:
+            try:
+                v1.delete_namespaced_persistent_volume_claim(
+                    name=f"{desk_id}-home", namespace=DESK_NAMESPACE
+                )
+            except Exception as e:
+                logger.warning(f"Cleanup PVC err for {desk_id}: {e}")
+
+        # Cleanup Traefik networking resources
+        try:
+            v1.delete_namespaced_service(name=desk_id, namespace=DESK_NAMESPACE)
+        except Exception as e:
+            logger.warning(f"Cleanup service err for {desk_id}: {e}")
+
+        try:
+            from backend.k8s import get_custom_objects, get_networking_v1
+
+            get_networking_v1().delete_namespaced_ingress(name=desk_id, namespace=DESK_NAMESPACE)
+            get_custom_objects().delete_namespaced_custom_object(
+                group="traefik.io",
+                version="v1alpha1",
+                namespace=DESK_NAMESPACE,
+                plural="middlewares",
+                name=f"strip-{desk_id}",
+            )
+        except Exception as e:
+            logger.warning(f"Cleanup networking err for {desk_id}: {e}")
+
+        return {"status": "stopped", "desk_id": desk_id, "message": "Stopped successfully"}
     except Exception as e:
         if hasattr(e, "status") and e.status == 404:
-            return {"status": "stopped", "desk_id": desk_id, "message": "EFS volume preserved"}
+            return {"status": "stopped", "desk_id": desk_id, "message": "Already stopped"}
         logger.error(f"Failed to stop desk {desk_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to stop desk: {e}")
 
@@ -386,7 +674,7 @@ async def desk_logs_ws(websocket: WebSocket, desk_id: str):
 
 
 @router.post("/{desk_id}/start-vscode")
-async def start_vscode(desk_id: str):
+def start_vscode(desk_id: str):
     """Apply VS Code theming and verify code-server is running.
 
     Code-server starts automatically with the pod entrypoint (port 9000).
@@ -409,6 +697,8 @@ async def start_vscode(desk_id: str):
                 status_code=409,
                 detail=f"Desk pod is {pod.status.phase}, not Running yet",
             )
+        # Extract the user from pod labels
+        user = pod.metadata.labels.get("ml-platform/user", "jovyan")
     except client.exceptions.ApiException as e:
         raise HTTPException(status_code=e.status, detail=f"Pod not found: {e.reason}")
 
@@ -469,31 +759,28 @@ async def start_vscode(desk_id: str):
 
         # Write settings into the pod
         settings_cmd = (
-            "mkdir -p /home/jovyan/.local/share/code-server/User && "
-            f"echo '{settings_json}' > /home/jovyan/.local/share/code-server/User/settings.json"
+            f"mkdir -p /home/{user}/.local/share/code-server/User && "
+            f"mkdir -p /home/{user}/.local/share/code-server/Machine && "
+            f"echo '{settings_json}' > /home/{user}/.local/share/code-server/User/settings.json && "
+            f"echo '{settings_json}' > /home/{user}/.local/share/code-server/Machine/settings.json && "
+            f"chown -R 1000:100 /home/{user}/.local"
         )
         _exec_in_pod(settings_cmd)
 
-        # Poll until code-server is listening on port 9000
-        # (started by pod entrypoint, may take a few seconds to boot)
-        for _ in range(15):
-            health_output = _exec_in_pod(
-                "curl -s -o /dev/null -w '%{http_code}'"
-                " http://localhost:9000/ 2>/dev/null || echo 000"
-            )
-            if health_output.strip() in ("200", "302"):
-                return {"status": "started", "desk_id": desk_id}
-            await asyncio.sleep(1)
-
-        raise HTTPException(
-            status_code=503,
-            detail="Code-server did not become ready within 15 seconds",
-        )
+        return {"status": "started", "desk_id": desk_id}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to start code-server in {desk_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        logger.error(f"Failed to start code-server in {desk_id}: {error_msg}")
+
+        # If the pod phase is 'Running' but the container engine hasn't fully started the container,
+        # k8s_stream throws a 500 handshake error or 'container not found'. We should treat this
+        # as a 'Pending' state so the frontend knows to keep waiting.
+        if "Handshake status 500" in error_msg or "container not found" in error_msg:
+            raise HTTPException(status_code=409, detail="ContainerInitializing")
+
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 class RunCodeRequest(BaseModel):
@@ -543,7 +830,7 @@ sys.stdout.write("__RICH_OUTPUT_JSON__" + _result)
 
 
 @router.post("/{desk_id}/run")
-async def run_desk_code(desk_id: str, req: RunCodeRequest):
+def run_desk_code(desk_id: str, req: RunCodeRequest):
     """Execute code inside the desk pod with rich output capture.
 
     Returns stdout text, error traceback, and base64-encoded
@@ -563,7 +850,7 @@ async def run_desk_code(desk_id: str, req: RunCodeRequest):
     # Inject user code safely via base64 decode
     wrapper = _EXEC_WRAPPER.replace(
         "CODE_PLACEHOLDER",
-        f'__import__("base64").b64decode("{code_b64}")' f".decode()",
+        f'__import__("base64").b64decode("{code_b64}").decode()',
     )
 
     try:
@@ -571,7 +858,7 @@ async def run_desk_code(desk_id: str, req: RunCodeRequest):
         import json
 
         escaped = wrapper.replace("'", "'\\''")
-        cmd = f"echo '{escaped}' > /tmp/_nb_exec.py " f"&& python -u /tmp/_nb_exec.py"
+        cmd = f"echo '{escaped}' > /tmp/_nb_exec.py && python -u /tmp/_nb_exec.py"
 
         resp = k8s_stream(
             v1.connect_get_namespaced_pod_exec,
