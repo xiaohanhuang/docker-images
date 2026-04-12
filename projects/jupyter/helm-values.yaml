@@ -5,6 +5,25 @@
 hub:
   nodeSelector:
     role: system
+  # Override default probes to include the base_url prefix.
+  # Without this, /hub/health 302-redirects to /jupyter/hub/hub/health → 404 → crash loop.
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 300
+    periodSeconds: 10
+    failureThreshold: 30
+    timeoutSeconds: 3
+    httpGet:
+      path: /jupyter/hub/health
+      port: http
+  readinessProbe:
+    enabled: true
+    periodSeconds: 2
+    failureThreshold: 1000
+    timeoutSeconds: 1
+    httpGet:
+      path: /jupyter/hub/health
+      port: http
   config:
     Authenticator:
       allowed_users:
