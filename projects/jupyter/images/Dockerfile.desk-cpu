@@ -18,6 +18,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Ensure 'python' exists — the base image only ships python3,
+# but start-notebook.py uses #!/usr/bin/env python
+RUN ln -sf /opt/conda/bin/python3 /usr/local/bin/python
+
 # Install code-server (pinned version for reproducibility)
 RUN curl -fsSL https://code-server.dev/install.sh | sh -s -- --version 4.111.0
 
