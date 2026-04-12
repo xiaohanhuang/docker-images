@@ -404,6 +404,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Create SOCI index for notebook-cpu
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_cpu == 'true'
+        uses: awslabs/soci-github-action@v1
+        with:
+          registry: ${{ env.ECR_REGISTRY }}
+          repository: ml-platform/notebook-cpu
+          image-tag: latest
+
       - name: Build and push notebook-marimo
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo == 'true'
         uses: docker/build-push-action@v6
@@ -419,6 +427,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Create SOCI index for notebook-marimo
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo == 'true'
+        uses: awslabs/soci-github-action@v1
+        with:
+          registry: ${{ env.ECR_REGISTRY }}
+          repository: ml-platform/notebook-marimo
+          image-tag: latest
+
       - name: Build and push notebook-marimo-vscode
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo_vscode == 'true'
         uses: docker/build-push-action@v6
@@ -433,6 +449,14 @@ jobs:
             ${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo-vscode:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Create SOCI index for notebook-marimo-vscode
+        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo_vscode == 'true'
+        uses: awslabs/soci-github-action@v1
+        with:
+          registry: ${{ env.ECR_REGISTRY }}
+          repository: ml-platform/notebook-marimo-vscode
+          image-tag: latest
 
       - name: Build and push gpu-idle-monitor
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.gpu_idle_monitor == 'true'
