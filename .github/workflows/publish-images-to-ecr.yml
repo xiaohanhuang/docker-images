@@ -532,6 +532,8 @@ jobs:
           platforms: linux/amd64
           push: true
           provenance: false
+          no-cache: true
+          pull: true
           tags: |
             ${{ env.ECR_REGISTRY }}/ml-platform/backend-api:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/backend-api:${{ github.sha }}
