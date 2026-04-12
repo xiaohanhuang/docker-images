@@ -395,7 +395,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
 
-      - name: Build and push notebook-cpu
+      - name: Build and push desk-cpu
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_cpu == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -404,24 +404,12 @@ jobs:
           platforms: linux/amd64
           push: true
           provenance: false
+          outputs: type=image,oci-mediatypes=true
           tags: |
-            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:latest
-            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ env.ECR_REGISTRY }}/ml-platform/desk-cpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/desk-cpu:${{ github.sha }}
 
-      - name: Create SOCI index for notebook-cpu
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_cpu == 'true'
-        run: |
-          set -eux
-          SOCI_VERSION=0.8.0
-          curl -sSL https://github.com/awslabs/soci-snapshotter/releases/download/v${SOCI_VERSION}/soci-snapshotter-${SOCI_VERSION}-linux-amd64.tar.gz | sudo tar -xz -C /usr/local/bin soci
-          IMAGE="${{ env.ECR_REGISTRY }}/ml-platform/notebook-cpu:latest"
-          sudo ctr image pull --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
-          sudo soci create "$IMAGE"
-          sudo soci push --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
-
-      - name: Build and push notebook-marimo
+      - name: Build and push notebook-marimo (base for desk-gpu)
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -437,17 +425,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Create SOCI index for notebook-marimo
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo == 'true'
-        run: |
-          set -eux
-          which soci || { SOCI_VERSION=0.8.0; curl -sSL https://github.com/awslabs/soci-snapshotter/releases/download/v${SOCI_VERSION}/soci-snapshotter-${SOCI_VERSION}-linux-amd64.tar.gz | sudo tar -xz -C /usr/local/bin soci; }
-          IMAGE="${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo:latest"
-          sudo ctr image pull --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
-          sudo soci create "$IMAGE"
-          sudo soci push --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
-
-      - name: Build and push notebook-marimo-vscode
+      - name: Build and push desk-gpu
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo_vscode == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -458,20 +436,10 @@ jobs:
           provenance: false
           outputs: type=image,oci-mediatypes=true
           tags: |
-            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo-vscode:latest
-            ${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo-vscode:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/ml-platform/desk-gpu:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/desk-gpu:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Create SOCI index for notebook-marimo-vscode
-        if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.notebook_marimo_vscode == 'true'
-        run: |
-          set -eux
-          which soci || { SOCI_VERSION=0.8.0; curl -sSL https://github.com/awslabs/soci-snapshotter/releases/download/v${SOCI_VERSION}/soci-snapshotter-${SOCI_VERSION}-linux-amd64.tar.gz | sudo tar -xz -C /usr/local/bin soci; }
-          IMAGE="${{ env.ECR_REGISTRY }}/ml-platform/notebook-marimo-vscode:latest"
-          sudo ctr image pull --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
-          sudo soci create "$IMAGE"
-          sudo soci push --user "AWS:$(aws ecr get-login-password)" "$IMAGE"
 
       - name: Build and push gpu-idle-monitor
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.gpu_idle_monitor == 'true'
