@@ -585,7 +585,7 @@ def stop_desk(desk_id: str, purge: bool = False) -> dict[str, str]:
             namespace=DESK_NAMESPACE,
             body=client.V1DeleteOptions(propagation_policy="Background"),
         )
-        
+
         if purge:
             try:
                 v1.delete_namespaced_persistent_volume_claim(
@@ -761,8 +761,10 @@ def start_vscode(desk_id: str):
         settings_cmd = (
             f"mkdir -p /home/{user}/.local/share/code-server/User && "
             f"mkdir -p /home/{user}/.local/share/code-server/Machine && "
-            f"echo '{settings_json}' > /home/{user}/.local/share/code-server/User/settings.json && "
-            f"echo '{settings_json}' > /home/{user}/.local/share/code-server/Machine/settings.json && "
+            f"echo '{settings_json}' > "
+            f"/home/{user}/.local/share/code-server/User/settings.json && "
+            f"echo '{settings_json}' > "
+            f"/home/{user}/.local/share/code-server/Machine/settings.json && "
             f"chown -R 1000:100 /home/{user}/.local"
         )
         _exec_in_pod(settings_cmd)
@@ -909,3 +911,4 @@ def run_desk_code(desk_id: str, req: RunCodeRequest):
             "images": [],
             "returncode": 1,
         }
+# cache-bust 1776032346
