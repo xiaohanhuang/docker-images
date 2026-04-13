@@ -6,7 +6,7 @@ A production-grade ML training platform on AWS EKS, combining **Flyte** (orchest
 - http://flyte.ml-platform.internal
 - http://grafana.ml-platform.internal
 - http://mlflow.ml-platform.internal
-- [See full networking guide →](docs/alb-ingress-guide.md)
+- [See full networking guide →](docs/infrastructure/alb-ingress-guide.md)
 
 ## Sub-Projects
 
@@ -44,7 +44,7 @@ cd ../.. && pip install -e .
 
 # 6. Configure environment for internal DNS
 export FLYTE_ENDPOINT=flyteadmin.ml-platform.internal:80
-export ML_PLAT_AGENT_URL=http://agent.ml-platform.internal
+export ML_PLAT_EXECUTION_URL=http://execution-service.ml-platform.internal
 export MLFLOW_TRACKING_URI=http://mlflow.ml-platform.internal
 
 # 7. Submit a training job
@@ -76,4 +76,4 @@ The pre-push hook blocks the push and prints the fix command if any check fails:
 
 ## Architecture
 
-See [`docs/architecture_design.md`](docs/) for the full architecture design, including comparisons with OpenConnect, Metaflow, and Michelangelo.
+See [`docs/architecture/architecture.md`](docs/architecture/architecture.md) for the full architecture design, including comparisons with OpenConnect, Metaflow, and Michelangelo.
