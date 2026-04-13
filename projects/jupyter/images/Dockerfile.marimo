@@ -27,4 +27,9 @@ RUN pip install --no-cache-dir --no-deps /opt/marimo-proxy/
 COPY --chown=${NB_UID}:${NB_GID} projects/components/sdk /opt/ml-platform-sdk/
 RUN pip install --no-cache-dir --no-deps -e /opt/ml-platform-sdk/
 
+# Platform CLI (mlp command)
+COPY --chown=${NB_UID}:${NB_GID} cli /opt/ml-platform-cli/cli/
+COPY --chown=${NB_UID}:${NB_GID} pyproject.toml /opt/ml-platform-cli/
+RUN pip install --no-cache-dir -e /opt/ml-platform-cli/
+
 EXPOSE 8888
