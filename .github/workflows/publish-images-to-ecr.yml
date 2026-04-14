@@ -443,6 +443,30 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Write pinned image tags to SSM so the backend API can reference
+      # the exact validated SHA instead of the mutable :latest tag.
+      # The backend reads DESK_IMAGE_CPU / DESK_IMAGE_GPU from env vars;
+      # CI/CD can update these SSM params independently of an API redeploy.
+      - name: Pin desk image tags in SSM
+        if: needs.detect.outputs.notebook_cpu == 'true' || needs.detect.outputs.notebook_marimo_vscode == 'true' || needs.detect.outputs.mode == 'force'
+        run: |
+          SHA="${{ github.sha }}"
+          REG="${{ env.ECR_REGISTRY }}"
+
+          if [[ "${{ needs.detect.outputs.notebook_cpu }}" == "true" || "${{ needs.detect.outputs.mode }}" == "force" ]]; then
+            aws ssm put-parameter --name "/ml-platform/desk/image/cpu" \
+              --value "${REG}/ml-platform/notebook-cpu:${SHA}" \
+              --type String --overwrite --region ${{ env.AWS_REGION }}
+            echo "Pinned CPU desk image -> notebook-cpu:${SHA}"
+          fi
+
+          if [[ "${{ needs.detect.outputs.notebook_marimo_vscode }}" == "true" || "${{ needs.detect.outputs.mode }}" == "force" ]]; then
+            aws ssm put-parameter --name "/ml-platform/desk/image/gpu" \
+              --value "${REG}/ml-platform/notebook-marimo-vscode:${SHA}" \
+              --type String --overwrite --region ${{ env.AWS_REGION }}
+            echo "Pinned GPU desk image -> notebook-marimo-vscode:${SHA}"
+          fi
+
 
       - name: Build and push gpu-idle-monitor
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.gpu_idle_monitor == 'true'
