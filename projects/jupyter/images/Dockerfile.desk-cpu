@@ -39,7 +39,11 @@ COPY --chown=${NB_UID}:${NB_GID} projects/jupyter/images/marimo_proxy /opt/marim
 RUN pip install --no-cache-dir --no-deps /opt/marimo-proxy/
 
 # Install Continue AI coding extension (auto-complete & chat via Bedrock)
-RUN code-server --install-extension Continue.continue
+# Open-VSX marketplace can intermittently return 403; retry with backoff.
+RUN for i in 1 2 3 4 5; do \
+      code-server --install-extension Continue.continue && break; \
+      echo "Attempt $i failed, retrying in ${i}0s..."; sleep ${i}0; \
+    done || echo "WARN: Continue extension install failed — skipping"
 
 # Pre-configure Continue with AWS Bedrock (Claude 3.5 Sonnet)
 # Pods inherit IAM credentials via IRSA — no hardcoded keys needed.
