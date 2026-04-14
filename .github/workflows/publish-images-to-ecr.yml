@@ -223,6 +223,8 @@ jobs:
             REPO=ml-platform
             BASE_TAG=latest
           tags: |
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool:latest
+            ${{ env.ECR_REGISTRY }}/ml-platform/executor-pool:${{ github.sha }}
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-gpu:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/executor-gpu:${{ github.sha }}
           cache-from: type=gha
@@ -441,6 +443,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+
       - name: Build and push gpu-idle-monitor
         if: needs.detect.outputs.mode == 'force' || needs.detect.outputs.gpu_idle_monitor == 'true'
         uses: docker/build-push-action@v6
@@ -538,3 +541,74 @@ jobs:
             ${{ env.ECR_REGISTRY }}/ml-platform/backend-api:latest
             ${{ env.ECR_REGISTRY }}/ml-platform/backend-api:${{ github.sha }}
 
+  # -- SOCI Index Generation ---------------------------------------------------
+  # Build SOCI (Seekable OCI) indexes for large images after all builds complete.
+  # SOCI enables lazy-loading: nodes mount the container filesystem immediately
+  # and stream layer data on-demand, cutting cold-start pull time to near-zero.
+  # The nodes expect a tag named "<tag>-soci" per fallback_tag_pattern in the
+  # karpenter nodeclass userData (e.g. latest -> latest-soci).
+  build-soci-indexes:
+    runs-on: ubuntu-latest
+    needs: [build-gpu-stack, build-cpu-stack, build-independent, build-proprietary-services]
+    if: always() && (needs.build-gpu-stack.result == 'success' || needs.build-cpu-stack.result == 'success' || needs.build-independent.result == 'success')
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Install soci-snapshotter CLI
+        run: |
+          SOCI_VERSION=0.9.0
+          curl -sSfL \
+            "https://github.com/awslabs/soci-snapshotter/releases/download/v${SOCI_VERSION}/soci-snapshotter-${SOCI_VERSION}-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin soci
+          soci version
+
+      - name: Generate and push SOCI indexes
+        run: |
+          set -euo pipefail
+
+          REGISTRY="${{ env.ECR_REGISTRY }}"
+
+          # Large images that benefit most from SOCI lazy-loading.
+          # Format: "repo:source-tag:soci-tag"
+          IMAGES=(
+            "ml-platform/executor-pool:latest:latest-soci"
+            "ml-platform/executor-gpu:latest:latest-soci"
+            "ml-platform/executor-pool-cpu:latest:latest-soci"
+            "ml-platform/base-gpu-torch:latest:latest-soci"
+            "ml-platform/ray-worker:latest:latest-soci"
+            "ml-platform/training-llm:latest:latest-soci"
+            "ml-platform/ml-gpu:latest:latest-soci"
+            "ml-platform/flyte-gpu:latest:latest-soci"
+            "ml-platform/notebook-marimo:latest:latest-soci"
+            "ml-platform/notebook-marimo-vscode:latest:latest-soci"
+            "ml-platform/notebook-cpu:latest:latest-soci"
+          )
+
+          for entry in "${IMAGES[@]}"; do
+            IFS=':' read -r repo src_tag soci_tag <<< "$entry"
+            full_image="${REGISTRY}/${repo}:${src_tag}"
+            echo ""
+            echo "==> Generating SOCI index for ${full_image}"
+
+            # Pull the image so soci can inspect its layers
+            docker pull "${full_image}" || { echo "  SKIP: image not found"; continue; }
+
+            # Generate and push SOCI index — this creates an OCI referrer manifest in ECR
+            soci push --existing-index skip "${full_image}" \
+              --tag "${REGISTRY}/${repo}:${soci_tag}" || \
+              echo "  WARNING: soci push failed for ${full_image} (non-fatal)"
+
+            echo "  ✅ SOCI index pushed as ${REGISTRY}/${repo}:${soci_tag}"
+          done
