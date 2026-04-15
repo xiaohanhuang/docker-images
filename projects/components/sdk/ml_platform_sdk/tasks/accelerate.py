@@ -150,10 +150,12 @@ class Platform:
                 )
 
         # 3. MLflow logging (rank 0 only, best-effort)
+        self._rank = rank
         if rank == 0:
             try:
                 import mlflow
 
+                self._ensure_mlflow_run()
                 mlflow.log_params(
                     {
                         "strategy": strategy,
@@ -196,6 +198,68 @@ class Platform:
                 )
 
         return model, optimizer, dataloader
+
+    def _ensure_mlflow_run(self):
+        """Start an MLflow run if one isn't already active (best-effort)."""
+        try:
+            import mlflow
+
+            tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
+            if tracking_uri:
+                mlflow.set_tracking_uri(tracking_uri)
+            if mlflow.active_run() is None:
+                mlflow.start_run()
+        except Exception:
+            pass
+
+    def log(self, metrics: dict, step: int | None = None) -> None:
+        """Log metrics to MLflow from any rank — only rank 0 actually sends.
+
+        Call this inside your training loop instead of using mlflow directly.
+        No-op if MLflow is unavailable or not configured.
+
+        Args:
+            metrics: Dict of metric name → scalar value.
+            step: Optional global step / epoch index.
+
+        Example::
+
+            for epoch in range(epochs):
+                loss = train_one_epoch(...)
+                platform.log({"loss": loss, "lr": scheduler.get_last_lr()[0]}, step=epoch)
+        """
+        rank = getattr(self, "_rank", int(os.environ.get("RANK", "0")))
+        if rank != 0:
+            return
+        try:
+            import mlflow
+
+            self._ensure_mlflow_run()
+            mlflow.log_metrics(metrics, step=step)
+        except Exception:
+            pass
+
+    def log_params(self, params: dict) -> None:
+        """Log hyperparameters to MLflow (rank 0 only, best-effort).
+
+        Args:
+            params: Dict of param name → value.
+
+        Example::
+
+            platform.log_params({"lr": 1e-4, "batch_size": 32, "model": "resnet18"})
+        """
+        rank = getattr(self, "_rank", int(os.environ.get("RANK", "0")))
+        if rank != 0:
+            return
+        try:
+            import mlflow
+
+            self._ensure_mlflow_run()
+            mlflow.log_params(params)
+        except Exception:
+            pass
+
 
     def _heuristics(self, model, *, batch_size: int | None = None) -> str:
         """Choose strategy based on model size and GPU VRAM.

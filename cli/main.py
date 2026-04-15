@@ -71,8 +71,16 @@ def load_config():
             os.environ.setdefault("TEAMS_WEBHOOK_URL", notifs["teams_webhook_url"])
 
 
+# Use the actual binary name so --install-completion registers the right
+# env var (_MLP_COMPLETE when invoked as mlp, _ML_PLAT_COMPLETE for ml-plat).
+_invoked_name = os.path.basename(sys.argv[0]) if sys.argv else "ml-plat"
+# Normalise: strip .py / .exe suffixes and default if empty
+if "." in _invoked_name:
+    _invoked_name = _invoked_name.rsplit(".", 1)[0]
+_cli_name = _invoked_name if _invoked_name in ("mlp", "ml-plat") else "ml-plat"
+
 app = typer.Typer(
-    name="ml-plat",
+    name=_cli_name,
     help="CLI for the ML Training Platform on AWS EKS",
 )
 

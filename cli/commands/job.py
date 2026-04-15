@@ -4,6 +4,7 @@ import os
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich import box
 
 from backend.pricing import get_cost_estimate
 
@@ -20,6 +21,86 @@ def _api():
 
 # Endpoint resolution is handled by cli.utils.flyte_remote() which reads
 # from ~/.ml-plat/config.yaml and environment variables.
+
+
+@app.command("history")
+def job_history(
+    limit: int = typer.Option(20, "--limit", "-n", help="Number of recent jobs to show"),
+    project: str = typer.Option(None, "--project", "-p", help="Filter by Flyte project"),
+    domain: str = typer.Option("development", "--domain", "-d", help="Flyte domain"),
+):
+    """
+    Show recent job run history with status and cost.
+    """
+    try:
+        with _api() as client:
+            result = client.list_jobs(limit=limit, project=project, domain=domain)
+    except Exception as e:
+        typer.secho(f"Failed to fetch job history: {e}", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    jobs = result.get("jobs", result.get("executions", []))
+    if not jobs:
+        console.print("[yellow]No jobs found.[/yellow]")
+        return
+
+    phase_style = {
+        "SUCCEEDED": "[bold green]✓ SUCCEEDED[/bold green]",
+        "RUNNING":   "[bold cyan]⟳ RUNNING[/bold cyan]",
+        "FAILED":    "[bold red]✗ FAILED[/bold red]",
+        "ABORTED":   "[yellow]⊘ ABORTED[/yellow]",
+        "QUEUED":    "[dim]◌ QUEUED[/dim]",
+    }
+
+    table = Table(
+        title=f"Recent Jobs (last {len(jobs)})",
+        box=box.ROUNDED,
+        show_lines=False,
+        header_style="bold magenta",
+        expand=False,
+    )
+    table.add_column("Job ID",    style="cyan",  no_wrap=True, max_width=42)
+    table.add_column("Workflow",  style="white", no_wrap=True, max_width=30)
+    table.add_column("Status",    no_wrap=True)
+    table.add_column("Started",   style="dim",   no_wrap=True)
+    table.add_column("Duration",  justify="right", no_wrap=True)
+    table.add_column("Est. Cost", justify="right", style="bold green", no_wrap=True)
+
+    for job in jobs:
+        job_id       = job.get("job_id") or job.get("id", "—")
+        workflow     = job.get("workflow_name") or job.get("workflow", "—")
+        # Trim long workflow paths to just the last component
+        if "." in workflow:
+            workflow = workflow.rsplit(".", 1)[-1]
+        status       = job.get("status", "UNKNOWN").upper()
+        status_str   = phase_style.get(status, f"[white]{status}[/white]")
+
+        started_raw  = job.get("started_at") or job.get("start_time", "")
+        try:
+            started_dt = datetime.datetime.fromisoformat(started_raw.replace("Z", "+00:00"))
+            started    = started_dt.strftime("%b %d %H:%M")
+        except Exception:
+            started    = started_raw[:16] if started_raw else "—"
+
+        duration_str = job.get("duration", "—")
+        instance     = job.get("instance_type", "unknown")
+
+        # Estimate cost
+        try:
+            parts    = duration_str.split(":")
+            hours    = int(parts[0])
+            mins     = int(parts[1]) if len(parts) > 1 else 0
+            secs     = int(parts[2].split(".")[0]) if len(parts) > 2 else 0
+            duration = datetime.timedelta(hours=hours, minutes=mins, seconds=secs)
+            cost     = f"${get_cost_estimate(instance, duration):.2f}"
+        except Exception:
+            cost     = "—"
+
+        table.add_row(job_id, workflow, status_str, started, duration_str, cost)
+
+    console.print(table)
+    console.print(f"\n[dim]mlp job status <job-id>   for details[/dim]")
+    console.print(f"[dim]mlp job logs   <job-id>   to stream logs[/dim]")
 
 
 @app.command("submit")

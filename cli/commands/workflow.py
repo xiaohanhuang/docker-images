@@ -866,13 +866,81 @@ def _watch_execution(exec_id: str, remote, interval: int = 10):
 
 # ── status ────────────────────────────────────────────────────────────
 @app.command("status")
-def status(execution_id: str = typer.Argument(...)):
-    """Quick status of a workflow execution."""
+def status(execution_id: str = typer.Argument(..., help="Execution ID to inspect")):
+    """Show status, inputs, and exact rerun command for a workflow execution."""
+    from datetime import timezone
+
     remote = flyte_remote()
-    ex = remote.fetch_execution(name=execution_id)
-    remote.sync_execution(ex, sync_nodes=False)
-    phase = str(ex.closure.phase)
-    console.print(f"[bold]{execution_id}[/bold]: {phase}")
+    try:
+        ex = remote.fetch_execution(name=execution_id)
+        remote.sync_execution(ex, sync_nodes=False)
+    except Exception as exc:
+        console.print(f"[red]Could not fetch execution '{execution_id}': {exc}[/red]")
+        raise typer.Exit(1)
+
+    from flytekit.models.core.execution import WorkflowExecutionPhase
+
+    phase_int = ex.closure.phase
+    phase_str = (
+        WorkflowExecutionPhase.enum_to_string(phase_int)
+        if hasattr(phase_int, "real")
+        else str(phase_int)
+    )
+    if phase_str == "SUCCEEDING":
+        phase_str = "SUCCEEDED"
+
+    phase_style = {"SUCCEEDED": "cyan", "RUNNING": "bold green", "FAILED": "bold red", "ABORTED": "yellow"}
+    style = phase_style.get(phase_str, "white")
+
+    wf_name = ex.spec.launch_plan.name
+    started = ex.closure.started_at
+    started_str = started.strftime("%Y-%m-%d %H:%M UTC") if started else "—"
+    ended = ex.closure.updated_at
+    duration_str = "—"
+    if started and ended:
+        delta = int((ended - started).total_seconds())
+        duration_str = f"{delta // 60}m {delta % 60}s" if delta >= 60 else f"{delta}s"
+
+    console.print()
+    from rich.panel import Panel
+    console.print(Panel(
+        f"[bold]{execution_id}[/bold]\n"
+        f"Workflow : [yellow]{wf_name}[/yellow]\n"
+        f"Status   : [{style}]{phase_str}[/{style}]\n"
+        f"Started  : [dim]{started_str}[/dim]\n"
+        f"Duration : [dim]{duration_str}[/dim]",
+        title="[bold cyan]Execution[/bold cyan]",
+        border_style="cyan",
+    ))
+
+    # Extract and display inputs
+    input_parts = []
+    try:
+        inputs_lm = ex.spec.inputs
+        if inputs_lm and inputs_lm.literals:
+            for key in sorted(inputs_lm.literals):
+                val = _extract_literal_value(inputs_lm.literals[key])
+                input_parts.append((key, val))
+    except Exception:
+        pass
+
+    if input_parts:
+        from rich.table import Table
+        t = Table(box=None, show_header=False, padding=(0, 2))
+        t.add_column(style="dim")
+        t.add_column(style="white")
+        for k, v in input_parts:
+            t.add_row(k, v)
+        console.print("\n[bold]Inputs:[/bold]")
+        console.print(t)
+        kv_args = " ".join(f"{k}={v}" for k, v in input_parts)
+        console.print(f"\n[bold]Rerun:[/bold]")
+        console.print(f"  [bold green]mlp workflow run {wf_name} {kv_args}[/bold green]")
+    else:
+        console.print("\n[dim]Inputs: (defaults)[/dim]")
+        console.print(f"\n[bold]Rerun:[/bold]")
+        console.print(f"  [bold green]mlp workflow run {wf_name}[/bold green]")
+    console.print()
 
 
 # ── history ───────────────────────────────────────────────────────────
