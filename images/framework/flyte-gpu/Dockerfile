@@ -26,9 +26,13 @@ ARG FLYTEKIT_VERSION=1.16.14
 ARG BOTO3_VERSION=1.42.61
 ARG S3FS_VERSION=2026.2.0
 ARG REQUESTS_VERSION=2.32.5
+ARG RAY_VERSION=2.54.0
 
 RUN pip install --no-cache-dir \
     flytekit==${FLYTEKIT_VERSION} \
+    flytekitplugins-kfpytorch==${FLYTEKIT_VERSION} \
+    flytekitplugins-ray==${FLYTEKIT_VERSION} \
+    "ray[default]==${RAY_VERSION}" \
     boto3==${BOTO3_VERSION} \
     s3fs==${S3FS_VERSION} \
     requests==${REQUESTS_VERSION}
