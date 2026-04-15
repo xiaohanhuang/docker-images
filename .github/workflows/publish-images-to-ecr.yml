@@ -450,6 +450,7 @@ jobs:
       # CI/CD can update these SSM params independently of an API redeploy.
       - name: Pin desk image tags in SSM
         if: needs.detect.outputs.notebook_cpu == 'true' || needs.detect.outputs.notebook_marimo_vscode == 'true' || needs.detect.outputs.mode == 'force'
+        continue-on-error: true  # non-fatal: image is still pushed; SSM pin is best-effort
         run: |
           SHA="${{ github.sha }}"
           REG="${{ env.ECR_REGISTRY }}"
@@ -597,7 +598,7 @@ jobs:
           curl -sSfL \
             "https://github.com/awslabs/soci-snapshotter/releases/download/v${SOCI_VERSION}/soci-snapshotter-${SOCI_VERSION}-linux-amd64.tar.gz" \
             | tar -xz -C /usr/local/bin soci
-          soci version
+          soci --version 2>/dev/null || soci 2>&1 | head -1 || true  # soci has no 'version' subcommand
 
       - name: Generate and push SOCI indexes
         run: |
