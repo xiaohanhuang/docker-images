@@ -274,7 +274,7 @@ def fault_tolerant_distributed_task(
             ...
     """
     try:
-        from flytekitplugins.kfpytorch import PyTorch, Worker
+        from flytekitplugins.kfpytorch import Master, PyTorch, Worker
     except ImportError:
         raise ImportError(
             "flytekitplugins-kfpytorch is required for fault_tolerant_distributed_task. "
@@ -290,7 +290,7 @@ def fault_tolerant_distributed_task(
     )
 
     pytorch_config = PyTorch(
-        master=Worker(replicas=1),
+        master=Master(),
         worker=Worker(replicas=num_workers),
         increase_shared_mem=False,
     )
@@ -499,60 +499,69 @@ def fault_tolerant_ray_task(
     # User-supplied env vars first, then checkpoint_env overwrites to prevent
     # accidental override of checkpoint configuration
     merged_env = {**kwargs.get("environment", {}), **checkpoint_env}
-    worker_env_vars = [{"name": k, "value": v} for k, v in merged_env.items()]
 
-    # Ray worker pod template with EFS and GPU
-    worker_pod_template = {
-        "spec": {
-            "containers": [
-                {
-                    "name": "ray-worker",
-                    "volumeMounts": [{"name": EFS_VOLUME_NAME, "mountPath": EFS_MOUNT_PATH}],
-                    "env": worker_env_vars,
-                    "resources": {
-                        "requests": {
-                            "cpu": str(worker_node_resources.cpu or "4"),
-                            "memory": str(worker_node_resources.mem or "16Gi"),
-                            **(
-                                {"nvidia.com/gpu": str(worker_node_resources.gpu)}
-                                if worker_node_resources.gpu
-                                else {}
-                            ),
-                        },
-                        "limits": {
-                            "cpu": str(worker_node_resources.cpu or "4"),
-                            "memory": str(worker_node_resources.mem or "16Gi"),
-                            **(
-                                {"nvidia.com/gpu": str(worker_node_resources.gpu)}
-                                if worker_node_resources.gpu
-                                else {}
-                            ),
-                        },
-                    },
-                }
-            ],
-            "volumes": [
-                {
-                    "name": EFS_VOLUME_NAME,
-                    "persistentVolumeClaim": {"claimName": EFS_PVC_NAME},
-                }
-            ],
-            **(
-                {
-                    "tolerations": [
-                        {
-                            "key": "nvidia.com/gpu",
-                            "operator": "Equal",
-                            "value": "true",
-                            "effect": "NoSchedule",
-                        }
-                    ]
-                }
-                if worker_node_resources.gpu
-                else {}
-            ),
-        }
+    from kubernetes.client import (
+        V1Container,
+        V1EnvVar,
+        V1PersistentVolumeClaimVolumeSource,
+        V1PodSpec,
+        V1ResourceRequirements,
+        V1Volume,
+        V1VolumeMount,
+    )
+
+    worker_env_vars = [V1EnvVar(name=k, value=v) for k, v in merged_env.items()]
+
+    # Build resource dict
+    resource_requests = {
+        "cpu": str(worker_node_resources.cpu or "4"),
+        "memory": str(worker_node_resources.mem or "16Gi"),
     }
+    resource_limits = dict(resource_requests)
+    if worker_node_resources.gpu:
+        resource_requests["nvidia.com/gpu"] = str(worker_node_resources.gpu)
+        resource_limits["nvidia.com/gpu"] = str(worker_node_resources.gpu)
+
+    # GPU toleration
+    gpu_tolerations = (
+        [
+            V1Toleration(
+                key="nvidia.com/gpu",
+                operator="Equal",
+                value="true",
+                effect="NoSchedule",
+            )
+        ]
+        if worker_node_resources.gpu
+        else []
+    )
+
+    worker_pod_template = PodTemplate(
+        pod_spec=V1PodSpec(
+            containers=[
+                V1Container(
+                    name="ray-worker",
+                    volume_mounts=[
+                        V1VolumeMount(name=EFS_VOLUME_NAME, mount_path=EFS_MOUNT_PATH)
+                    ],
+                    env=worker_env_vars,
+                    resources=V1ResourceRequirements(
+                        requests=resource_requests,
+                        limits=resource_limits,
+                    ),
+                )
+            ],
+            volumes=[
+                V1Volume(
+                    name=EFS_VOLUME_NAME,
+                    persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(
+                        claim_name=EFS_PVC_NAME
+                    ),
+                )
+            ],
+            tolerations=gpu_tolerations,
+        )
+    )
 
     ray_config = RayJobConfig(
         head_node_config=HeadNodeConfig(

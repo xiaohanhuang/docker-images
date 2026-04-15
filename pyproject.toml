@@ -11,6 +11,7 @@ dependencies = [
     "flytekit>=1.10.0",
     "flytekitplugins-ray>=1.10.0",
     "flytekitplugins-kfpytorch>=1.10.0",
+    "flytekitplugins-spark>=1.10.0",
     "jinja2>=3.1",
     "boto3>=1.34",
     "cloudpickle>=3.0",
