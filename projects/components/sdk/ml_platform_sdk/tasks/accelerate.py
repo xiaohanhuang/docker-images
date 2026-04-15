@@ -260,7 +260,6 @@ class Platform:
         except Exception:
             pass
 
-
     def _heuristics(self, model, *, batch_size: int | None = None) -> str:
         """Choose strategy based on model size and GPU VRAM.
 

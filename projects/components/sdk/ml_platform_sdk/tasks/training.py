@@ -165,6 +165,7 @@ def pytorch_ddp_config(
         def ddp_train() -> str:
             ...
     """
+    from flytekitplugins.kfpytorch import PyTorch, Worker
     from kubernetes.client import (
         V1Affinity,
         V1Container,
@@ -178,7 +179,6 @@ def pytorch_ddp_config(
         V1Volume,
         V1VolumeMount,
     )
-    from flytekitplugins.kfpytorch import PyTorch, Worker
 
     gpu_toleration = V1Toleration(
         key="nvidia.com/gpu",
@@ -215,14 +215,10 @@ def pytorch_ddp_config(
         volumes.append(
             V1Volume(
                 name="efs-storage",
-                persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(
-                    claim_name=efs_claim
-                ),
+                persistent_volume_claim=V1PersistentVolumeClaimVolumeSource(claim_name=efs_claim),
             )
         )
-        volume_mounts.append(
-            V1VolumeMount(name="efs-storage", mount_path=efs_mount_path)
-        )
+        volume_mounts.append(V1VolumeMount(name="efs-storage", mount_path=efs_mount_path))
 
     # Pod spec shared by master and worker — tolerations + EFS
     worker_pod_spec = V1PodSpec(

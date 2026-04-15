@@ -868,7 +868,6 @@ def _watch_execution(exec_id: str, remote, interval: int = 10):
 @app.command("status")
 def status(execution_id: str = typer.Argument(..., help="Execution ID to inspect")):
     """Show status, inputs, and exact rerun command for a workflow execution."""
-    from datetime import timezone
 
     remote = flyte_remote()
     try:
@@ -889,7 +888,12 @@ def status(execution_id: str = typer.Argument(..., help="Execution ID to inspect
     if phase_str == "SUCCEEDING":
         phase_str = "SUCCEEDED"
 
-    phase_style = {"SUCCEEDED": "cyan", "RUNNING": "bold green", "FAILED": "bold red", "ABORTED": "yellow"}
+    phase_style = {
+        "SUCCEEDED": "cyan",
+        "RUNNING": "bold green",
+        "FAILED": "bold red",
+        "ABORTED": "yellow",
+    }
     style = phase_style.get(phase_str, "white")
 
     wf_name = ex.spec.launch_plan.name
@@ -903,15 +907,18 @@ def status(execution_id: str = typer.Argument(..., help="Execution ID to inspect
 
     console.print()
     from rich.panel import Panel
-    console.print(Panel(
-        f"[bold]{execution_id}[/bold]\n"
-        f"Workflow : [yellow]{wf_name}[/yellow]\n"
-        f"Status   : [{style}]{phase_str}[/{style}]\n"
-        f"Started  : [dim]{started_str}[/dim]\n"
-        f"Duration : [dim]{duration_str}[/dim]",
-        title="[bold cyan]Execution[/bold cyan]",
-        border_style="cyan",
-    ))
+
+    console.print(
+        Panel(
+            f"[bold]{execution_id}[/bold]\n"
+            f"Workflow : [yellow]{wf_name}[/yellow]\n"
+            f"Status   : [{style}]{phase_str}[/{style}]\n"
+            f"Started  : [dim]{started_str}[/dim]\n"
+            f"Duration : [dim]{duration_str}[/dim]",
+            title="[bold cyan]Execution[/bold cyan]",
+            border_style="cyan",
+        )
+    )
 
     # Extract and display inputs
     input_parts = []
@@ -926,6 +933,7 @@ def status(execution_id: str = typer.Argument(..., help="Execution ID to inspect
 
     if input_parts:
         from rich.table import Table
+
         t = Table(box=None, show_header=False, padding=(0, 2))
         t.add_column(style="dim")
         t.add_column(style="white")
@@ -934,11 +942,11 @@ def status(execution_id: str = typer.Argument(..., help="Execution ID to inspect
         console.print("\n[bold]Inputs:[/bold]")
         console.print(t)
         kv_args = " ".join(f"{k}={v}" for k, v in input_parts)
-        console.print(f"\n[bold]Rerun:[/bold]")
+        console.print("\n[bold]Rerun:[/bold]")
         console.print(f"  [bold green]mlp workflow run {wf_name} {kv_args}[/bold green]")
     else:
         console.print("\n[dim]Inputs: (defaults)[/dim]")
-        console.print(f"\n[bold]Rerun:[/bold]")
+        console.print("\n[bold]Rerun:[/bold]")
         console.print(f"  [bold green]mlp workflow run {wf_name}[/bold green]")
     console.print()
 
