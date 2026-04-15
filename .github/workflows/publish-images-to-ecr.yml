@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: publish-images-to-ecr-${{ github.ref }}-${{ github.event_name }}-${{ inputs.force }}
