@@ -274,7 +274,7 @@ def fault_tolerant_distributed_task(
             ...
     """
     try:
-        from flytekitplugins.kfpytorch import Master, PyTorch, Worker
+        from flytekitplugins.kfpytorch import PyTorch
     except ImportError:
         raise ImportError(
             "flytekitplugins-kfpytorch is required for fault_tolerant_distributed_task. "
@@ -290,8 +290,7 @@ def fault_tolerant_distributed_task(
     )
 
     pytorch_config = PyTorch(
-        master=Master(),
-        worker=Worker(replicas=num_workers),
+        num_workers=num_workers,
         increase_shared_mem=False,
     )
 

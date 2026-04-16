@@ -153,10 +153,10 @@ def register_workflow(
     else:
         base_registry = default_fqn.rsplit("/", 1)[0]
     cpu_fqn = f"{base_registry}/ml-platform/data-cpu"
-    gpu_fqn = f"{base_registry}/ml-platform/ml-gpu"
+    gpu_fqn = f"{base_registry}/ml-platform/training-llm"
 
-    cpu_tag = image_tag
-    gpu_tag = wf_meta.get("gpu_image_tag") or resolve_image_tag("ML_GPU")
+    cpu_tag = "1.2.0"
+    gpu_tag = "1.1.0"
 
     image_config = ImageConfig(
         default_image=Image(name="default", fqn=default_fqn, tag=cpu_tag),

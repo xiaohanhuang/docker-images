@@ -156,6 +156,53 @@ full_finetune = _comp(
     },
 )
 
+train_reward_model = _comp(
+    "components.training.reward_model_trainer.task.train_reward_model",
+    inputs={
+        "base_model": str,
+        "preference_data_path": FlyteFile,
+        "prompt_column": str,
+        "chosen_column": str,
+        "rejected_column": str,
+        "modeling_type": str,
+        "epochs": int,
+        "learning_rate": float,
+        "batch_size": int,
+        "gradient_accumulation_steps": int,
+        "max_length": int,
+        "use_lora": bool,
+        "lora_rank": int,
+        "lora_alpha": int,
+        "num_gpus": int,
+        "mlflow_tracking_uri": str,
+        "mlflow_experiment_name": str,
+    },
+    outputs={
+        "checkpoint_path": FlyteDirectory,
+        "mlflow_run_id": str,
+        "accuracy": float,
+        "reward_margin": float,
+        "final_loss": float,
+    },
+    defaults={
+        "prompt_column": "prompt",
+        "chosen_column": "chosen",
+        "rejected_column": "rejected",
+        "modeling_type": "bradley_terry",
+        "epochs": 1,
+        "learning_rate": 1e-5,
+        "batch_size": 4,
+        "gradient_accumulation_steps": 4,
+        "max_length": 512,
+        "use_lora": True,
+        "lora_rank": 16,
+        "lora_alpha": 32,
+        "num_gpus": 1,
+        "mlflow_tracking_uri": "",
+        "mlflow_experiment_name": "reward-model-training",
+    },
+)
+
 # ── Evaluation Components ────────────────────────────────────────────────────
 
 model_evaluator = _comp(

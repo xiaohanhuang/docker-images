@@ -5,6 +5,7 @@ from typing import Any, Dict
 from flytekit import PodTemplate, Resources, task
 from flytekit.types.directory import FlyteDirectory
 from flytekitplugins.ray import HeadNodeConfig, RayJobConfig, WorkerNodeConfig
+from kubernetes.client import V1Container, V1PodSpec, V1ResourceRequirements, V1Toleration
 
 logger = logging.getLogger(__name__)
 
@@ -254,6 +255,7 @@ def pytorch_ddp_config(
 
 
 # Define the Ray Cluster Config
+# Define the Ray Cluster Config
 # This configures the ephemeral Ray cluster that Flyte spins up on K8s
 ray_config = RayJobConfig(
     head_node_config=HeadNodeConfig(
@@ -263,45 +265,40 @@ ray_config = RayJobConfig(
     worker_node_config=[
         WorkerNodeConfig(
             group_name="gpu-group",
-            replicas=2,  # Number of workers
+            replicas=2,
             min_replicas=1,
             max_replicas=4,
             ray_start_params={},
-            # requests/limits are mutually exclusive with pod_template in some Flytekit versions,
-            # but usually they can coexist if correctly structured.
-            # The error "Cannot specify both pod_template and requests/limits" suggests we must
-            # choose one.
-            # We will use pod_template as it allows nodeSelector/tolerations.
-            pod_template={
-                "spec": {
-                    "containers": [
-                        {
-                            "name": "ray-worker",
-                            "resources": {
-                                "requests": {
+            pod_template=PodTemplate(
+                pod_spec=V1PodSpec(
+                    containers=[
+                        V1Container(
+                            name="ray-worker",
+                            resources=V1ResourceRequirements(
+                                requests={
                                     "cpu": "4",
                                     "memory": "16Gi",
                                     "nvidia.com/gpu": "1",
                                 },
-                                "limits": {
+                                limits={
                                     "cpu": "8",
                                     "memory": "32Gi",
                                     "nvidia.com/gpu": "1",
                                 },
-                            },
-                        }
+                            ),
+                        )
                     ],
-                    "nodeSelector": {"karpenter.k8s.aws/instance-type": "g5.xlarge"},
-                    "tolerations": [
-                        {
-                            "key": "nvidia.com/gpu",
-                            "operator": "Equal",
-                            "value": "true",
-                            "effect": "NoSchedule",
-                        }
+                    node_selector={"karpenter.k8s.aws/instance-type": "g5.xlarge"},
+                    tolerations=[
+                        V1Toleration(
+                            key="nvidia.com/gpu",
+                            operator="Equal",
+                            value="true",
+                            effect="NoSchedule",
+                        )
                     ],
-                }
-            },
+                )
+            ),
         )
     ],
 )
