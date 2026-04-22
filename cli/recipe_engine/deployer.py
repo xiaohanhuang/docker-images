@@ -29,7 +29,7 @@ from cli.recipe_engine.schema import Architecture
 logger = logging.getLogger(__name__)
 
 # Labels applied to all resources for easy cleanup
-_MANAGED_BY = "ml-plat-recipe-engine"
+_MANAGED_BY = "mlp-recipe-engine"
 
 
 class DeploymentError(Exception):
@@ -46,7 +46,7 @@ class ArchitectureDeployer:
         2. status()   — check running state of deployed resources
         3. teardown() — kubectl delete all managed resources
 
-    All resources are labeled with ``app.kubernetes.io/managed-by: ml-plat-recipe-engine``
+    All resources are labeled with ``app.kubernetes.io/managed-by: mlp-recipe-engine``
     and ``app.kubernetes.io/instance: <recipe_name>`` for targeted cleanup.
     """
 

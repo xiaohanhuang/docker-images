@@ -7,7 +7,7 @@ access.
 Registry service URL resolution (highest → lowest priority):
 1. Explicit ``registry_url`` parameter
 2. ``ML_PLAT_REGISTRY_URL`` env var
-3. ``registry_url`` key in ``~/.ml-plat/config.yaml``
+3. ``registry_url`` key in ``~/.mlp/config.yaml``
 4. Service endpoint auto-discovered via ``kubectl get ingress``
 """
 
@@ -32,11 +32,11 @@ STATUS_FAILING = "failing"
 
 
 def _load_platform_config() -> dict:
-    """Read ``~/.ml-plat/config.yaml`` and return the raw dict (or ``{}``)."""
+    """Read ``~/.mlp/config.yaml`` and return the raw dict (or ``{}``)."""
     try:
         import yaml
 
-        cfg_path = Path.home() / ".ml-plat" / "config.yaml"
+        cfg_path = Path.home() / ".mlp" / "config.yaml"
         if cfg_path.exists():
             with open(cfg_path) as fh:
                 return yaml.safe_load(fh) or {}
@@ -75,7 +75,7 @@ def get_registry_url(explicit_url: Optional[str] = None) -> str:
     Priority:
     1. ``explicit_url`` parameter
     2. ``ML_PLAT_REGISTRY_URL`` env var
-    3. ``registry_url`` in ``~/.ml-plat/config.yaml``
+    3. ``registry_url`` in ``~/.mlp/config.yaml``
     4. Auto-discover from ``kubectl get ingress registry-service``
     5. Fallback ``http://localhost:8766``
     """
@@ -208,7 +208,7 @@ class RegistryClient:
         if 'filename="' in cd:
             filename = cd.split('filename="')[1].rstrip('"')
         if not filename:
-            filename = f"{recipe_name}-v{version}.ml-plat"
+            filename = f"{recipe_name}-v{version}.mlp"
 
         if output_path is None:
             dest = Path.cwd() / filename

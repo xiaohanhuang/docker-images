@@ -9,12 +9,12 @@ that declares the component's image, description, and tags.  The CLI reads
 this file to resolve images and compute content-hash versions.
 
 Commands:
-    ml-plat component list                            — list registered components
-    ml-plat component info <name>                     — show inputs, outputs, image
-    ml-plat component versions <name>                 — list registered versions
-    ml-plat component register training/lora_finetune — register one component
-    ml-plat component register training               — register all in a category
-    ml-plat component register --all                  — register everything
+    mlp component list                            — list registered components
+    mlp component info <name>                     — show inputs, outputs, image
+    mlp component versions <name>                 — list registered versions
+    mlp component register training/lora_finetune — register one component
+    mlp component register training               — register all in a category
+    mlp component register --all                  — register everything
 """
 
 from __future__ import annotations
@@ -208,7 +208,7 @@ def _list_task_ids(
 def _ensure_project(project: str):
     """Create the Flyte project if it does not already exist.
 
-    This lets users run ``ml-plat component register --project <name>``
+    This lets users run ``mlp component register --project <name>``
     without needing ``flytectl`` to pre-create the project.
     Prompts for confirmation before creating.
     """
@@ -230,7 +230,7 @@ def _ensure_project(project: str):
 
     try:
         remote.client.register_project(
-            Project(id=project, name=project, description="Auto-created by ml-plat")
+            Project(id=project, name=project, description="Auto-created by mlp")
         )
         console.print(f"[green]Created project '{project}'.[/green]")
     except Exception as exc:
@@ -346,8 +346,8 @@ def list_components(
     Queries FlyteAdmin for all tasks in the given project/domain.
 
     Examples:
-      ml-plat component list
-      ml-plat component list --project ml-platform --domain production
+      mlp component list
+      mlp component list --project ml-platform --domain production
     """
     try:
         task_ids = _list_task_ids(project=project, domain=domain)
@@ -385,7 +385,7 @@ def list_components(
     console.print(table)
     console.print(
         f"\n[dim]Total: {len(task_ids)} component(s).  "
-        "Run [bold]ml-plat component info <name>[/bold] for details.[/dim]\n"
+        "Run [bold]mlp component info <name>[/bold] for details.[/dim]\n"
     )
 
 
@@ -422,8 +422,8 @@ def list_versions(
     Queries FlyteAdmin for all versions of a task, newest first.
 
     Examples:
-      ml-plat component versions components.data.ingest.task.download_dataset
-      ml-plat component versions download_dataset --limit 5
+      mlp component versions components.data.ingest.task.download_dataset
+      mlp component versions download_dataset --limit 5
     """
     from flytekit.models.common import NamedEntityIdentifier
 
@@ -589,8 +589,8 @@ def component_info(
     Fetches task metadata directly from FlyteAdmin.
 
     Examples:
-      ml-plat component info components.training.finetune.finetune_lm
-      ml-plat component info download_dataset --version v1
+      mlp component info components.training.finetune.finetune_lm
+      mlp component info download_dataset --version v1
     """
     try:
         task = _fetch_task(
@@ -606,7 +606,7 @@ def component_info(
     if task is None:
         console.print(
             f"[bold red]Component not found:[/bold red] {name}\n"
-            "Run [bold]ml-plat component list[/bold] to see available components."
+            "Run [bold]mlp component list[/bold] to see available components."
         )
         raise typer.Exit(1)
 
@@ -1063,11 +1063,11 @@ def register_component(
     a full ECR URI via ``versions.env``.
 
     Examples:\n
-      ml-plat component register training/lora_finetune\n
-      ml-plat component register training\n
-      ml-plat component register --all\n
-      ml-plat component register --all --version v2.0\n
-      ml-plat component register ./my/path --image img:v1\n
+      mlp component register training/lora_finetune\n
+      mlp component register training\n
+      mlp component register --all\n
+      mlp component register --all --version v2.0\n
+      mlp component register ./my/path --image img:v1\n
     """
     proj = project or os.getenv("FLYTE_PROJECT", "flytesnacks")
     dom = domain or os.getenv("FLYTE_DOMAIN", "development")
@@ -1219,7 +1219,7 @@ def generate_stubs(
     parameter defaults.
 
     Example:
-      ml-plat component gen-stubs
+      mlp component gen-stubs
     """
     proj = project or os.getenv("FLYTE_PROJECT", "flytesnacks")
     dom = domain or os.getenv("FLYTE_DOMAIN", "development")
@@ -1468,11 +1468,11 @@ def run_component(
     FlyteFile/FlyteDirectory inputs accept S3 URIs or local paths.
 
     Examples:\n
-      ml-plat component run lora_finetune \\
+      mlp component run lora_finetune \\
           base_model=meta-llama/Llama-3.1-8B \\
           train_data_path=s3://bucket/data.jsonl \\
           epochs=3 --watch\n
-      ml-plat component run hf_dataset_loader \\
+      mlp component run hf_dataset_loader \\
           dataset_name=tatsu-lab/alpaca\n
     """
     from cli.utils import flyte_console_url
@@ -1484,7 +1484,7 @@ def run_component(
     if task is None:
         console.print(
             f"[bold red]Component not found:[/bold red] {name}\n"
-            "Run [bold]ml-plat component list[/bold] to see available components."
+            "Run [bold]mlp component list[/bold] to see available components."
         )
         raise typer.Exit(1)
 
@@ -1516,7 +1516,7 @@ def run_component(
 
             _watch_execution(exec_id, remote)
         except ImportError:
-            console.print(f"\n[dim]Run:[/dim] ml-plat workflow watch {exec_id}")
+            console.print(f"\n[dim]Run:[/dim] mlp workflow watch {exec_id}")
 
 
 # ── bump-image ───────────────────────────────────────────────────────────────
@@ -1562,8 +1562,8 @@ def bump_image(
     version with --set.  Creates the per-image key if it doesn't exist yet.
 
     Examples:
-      ml-plat component bump-image data-cpu          # 1.2.0 → 1.3.0
-      ml-plat component bump-image ml-gpu --set 2.0.0
+      mlp component bump-image data-cpu          # 1.2.0 → 1.3.0
+      mlp component bump-image ml-gpu --set 2.0.0
     """
     versions_env = _find_versions_env()
     if versions_env is None:

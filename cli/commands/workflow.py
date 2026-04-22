@@ -2,17 +2,17 @@
 workflow.py — CLI commands for ML workflow registration and management.
 
 Commands:
-  ml-plat workflow register — register a workflow with Flyte
-  ml-plat workflow list     — list registered workflows
-  ml-plat workflow info     — show workflow inputs, outputs, and metadata
-  ml-plat workflow run      — submit the pipeline to Flyte
-  ml-plat workflow watch    — live Mission Control dashboard
-  ml-plat workflow status   — quick status of an execution
-  ml-plat workflow history  — list recent executions with inputs
-  ml-plat workflow compare  — compare two runs in MLflow
-  ml-plat workflow promote  — promote model to Production
-  ml-plat workflow query    — run live inference via the serve endpoint
-  ml-plat workflow serve    — deploy inference server for a given run
+  mlp workflow register — register a workflow with Flyte
+  mlp workflow list     — list registered workflows
+  mlp workflow info     — show workflow inputs, outputs, and metadata
+  mlp workflow run      — submit the pipeline to Flyte
+  mlp workflow watch    — live Mission Control dashboard
+  mlp workflow status   — quick status of an execution
+  mlp workflow history  — list recent executions with inputs
+  mlp workflow compare  — compare two runs in MLflow
+  mlp workflow promote  — promote model to Production
+  mlp workflow query    — run live inference via the serve endpoint
+  mlp workflow serve    — deploy inference server for a given run
 """
 
 from __future__ import annotations
@@ -90,10 +90,10 @@ def register_workflow(
     registers them via the Flytekit API (no pyflyte subprocess).
 
     Examples:\n
-      ml-plat workflow register\n
-      ml-plat workflow register projects/workflows/text2sql\n
-      ml-plat workflow register . --version v2.0.0\n
-            ml-plat workflow register . --image <ecr-uri>:1.0.0\n
+      mlp workflow register\n
+      mlp workflow register projects/workflows/text2sql\n
+      mlp workflow register . --version v2.0.0\n
+            mlp workflow register . --image <ecr-uri>:1.0.0\n
     """
     import importlib.util
     import sys
@@ -104,7 +104,7 @@ def register_workflow(
         console.print(
             f"[bold red]No pipeline.py found in {workflow_dir}[/bold red]\n"
             "[dim]Point to a directory containing pipeline.py, "
-            "or cd into one and run: ml-plat workflow register[/dim]"
+            "or cd into one and run: mlp workflow register[/dim]"
         )
         raise typer.Exit(1)
 
@@ -256,7 +256,7 @@ def register_workflow(
         wf_names = [getattr(e, "name", "") for e in entities if isinstance(e, WorkflowBase)]
         if wf_names:
             console.print(
-                f"[dim]Run with: ml-plat workflow run {wf_names[0]}" f" --version {version}[/dim]"
+                f"[dim]Run with: mlp workflow run {wf_names[0]}" f" --version {version}[/dim]"
             )
     else:
         console.print("\n[bold red]❌ Registration failed.[/bold red]")
@@ -277,8 +277,8 @@ def list_workflows(
     """📦 List all registered workflows in the Flyte registry.
 
     Examples:\n
-      ml-plat workflow list\n
-      ml-plat workflow list --project ml-platform --domain production\n
+      mlp workflow list\n
+      mlp workflow list --project ml-platform --domain production\n
     """
     remote = flyte_remote()
     proj = project or os.getenv("FLYTE_PROJECT", "flytesnacks")
@@ -361,7 +361,7 @@ def list_workflows(
     console.print(table)
     console.print(
         f"\n[dim]Total: {len(active_ids)} workflow(s).  "
-        "Run [bold]ml-plat workflow run <name>[/bold] to execute one.[/dim]\n"
+        "Run [bold]mlp workflow run <name>[/bold] to execute one.[/dim]\n"
     )
 
 
@@ -433,8 +433,8 @@ def workflow_info(
     """🔍 Show detailed info about a workflow: inputs, outputs, nodes, and versions.
 
     Examples:\n
-      ml-plat workflow info pipeline.text2sql_pipeline\n
-      ml-plat workflow info recipe_openrlhf_llm_rlhf --version v1\n
+      mlp workflow info pipeline.text2sql_pipeline\n
+      mlp workflow info recipe_openrlhf_llm_rlhf --version v1\n
     """
     remote = flyte_remote()
     proj = project or os.getenv("FLYTE_PROJECT", remote.default_project)
@@ -470,7 +470,7 @@ def workflow_info(
         if resp.metadata.state == NamedEntityState.NAMED_ENTITY_ARCHIVED:
             console.print(
                 f"[bold yellow]Workflow '{name}' is archived.[/bold yellow]\n"
-                "[dim]Use [bold]ml-plat workflow list[/bold] to see active workflows.[/dim]"
+                "[dim]Use [bold]mlp workflow list[/bold] to see active workflows.[/dim]"
             )
             raise typer.Exit(0)
     except typer.Exit:
@@ -608,8 +608,8 @@ def run_workflow(
     """Submit a registered workflow to Flyte.
 
     Examples:\n
-      ml-plat workflow run pipeline.text2sql_pipeline num_epochs=5 batch_size=32 --watch\n
-      ml-plat workflow run pipeline.llm_sft_lora_pipeline base_model=llama-3.1-8B epochs=3\n
+      mlp workflow run pipeline.text2sql_pipeline num_epochs=5 batch_size=32 --watch\n
+      mlp workflow run pipeline.llm_sft_lora_pipeline base_model=llama-3.1-8B epochs=3\n
     """
     remote = flyte_remote()
     try:
@@ -679,7 +679,7 @@ def run_workflow(
     console.print("\n[bold green]✅ Pipeline submitted![/bold green]")
     console.print(f"   Execution ID : [bold]{exec_id}[/bold]")
     console.print(f"   Flyte URL    : {url}", soft_wrap=True)
-    console.print(f"\n[dim]Run:[/dim] ml-plat workflow watch {exec_id}\n")
+    console.print(f"\n[dim]Run:[/dim] mlp workflow watch {exec_id}\n")
 
     if watch:
         _watch_execution(exec_id, remote)
@@ -856,7 +856,7 @@ def _watch_execution(exec_id: str, remote, interval: int = 10):
 
     if phase_str == "SUCCEEDED":
         console.print("\n[bold green]🎉 Pipeline SUCCEEDED![/bold green]")
-        console.print("   Run: [bold]ml-plat workflow query[/bold]  to test inference")
+        console.print("   Run: [bold]mlp workflow query[/bold]  to test inference")
     else:
         console.print(f"\n[bold red]❌ Pipeline {phase_str}[/bold red]")
 
@@ -996,10 +996,10 @@ def history(
     """📜 List recent workflow executions with inputs and rerun commands.
 
     Examples:\n
-      ml-plat workflow history\n
-      ml-plat workflow history -n 5\n
-      ml-plat workflow history -w text2sql\n
-      ml-plat workflow history -s failed\n
+      mlp workflow history\n
+      mlp workflow history -n 5\n
+      mlp workflow history -w text2sql\n
+      mlp workflow history -s failed\n
     """
     from datetime import datetime, timezone
 
@@ -1146,15 +1146,15 @@ def history(
             console.print(f"  [dim]Inputs:[/dim]  {kv_str}")
             # Build rerun command
             kv_args = " ".join(f"{k}={v}" for k, v in input_parts)
-            console.print(f"  [dim]Rerun:[/dim]   ml-plat workflow run {wf_name} {kv_args}")
+            console.print(f"  [dim]Rerun:[/dim]   mlp workflow run {wf_name} {kv_args}")
         else:
             console.print("  [dim]Inputs:[/dim]  (defaults)")
-            console.print(f"  [dim]Rerun:[/dim]   ml-plat workflow run {wf_name}")
+            console.print(f"  [dim]Rerun:[/dim]   mlp workflow run {wf_name}")
 
     total = len(filtered)
     console.print(
         f"\n[dim]{total} execution(s) shown.  "
-        "Run [bold]ml-plat workflow watch <ID>[/bold] to monitor one.[/dim]\n"
+        "Run [bold]mlp workflow watch <ID>[/bold] to monitor one.[/dim]\n"
     )
 
 
@@ -1225,7 +1225,7 @@ def promote(
     console.print(
         f"[bold green]✅ Model [white]{model_name}[/white] v{version} → Production[/bold green]"
     )
-    console.print(f"\n[dim]Deploy with:[/dim] ml-plat workflow serve {run_id}")
+    console.print(f"\n[dim]Deploy with:[/dim] mlp workflow serve {run_id}")
 
 
 # ── serve ─────────────────────────────────────────────────────────────
@@ -1242,7 +1242,7 @@ def deploy_serve(run_id: str = typer.Argument(..., help="MLflow run ID whose che
     )
     if result.returncode == 0:
         console.print("[bold green]✅ Server deployed![/bold green]")
-        console.print("[dim]Access with:[/dim] ml-plat workflow query")
+        console.print("[dim]Access with:[/dim] mlp workflow query")
     else:
         console.print("[bold red]❌ Deployment failed.[/bold red]")
         raise typer.Exit(1)
@@ -1262,7 +1262,7 @@ def query(
     🔮  Translate a natural language question to SQL.
 
     Example:
-      ml-plat workflow query "list customers who spent over 1000 dollars"
+      mlp workflow query "list customers who spent over 1000 dollars"
     """
     import requests
 
@@ -1282,7 +1282,6 @@ def query(
         )
     except requests.exceptions.ConnectionError:
         console.print(
-            "[red]Inference server not running. "
-            "Deploy with: ml-plat workflow serve <run_id>[/red]"
+            "[red]Inference server not running. " "Deploy with: mlp workflow serve <run_id>[/red]"
         )
         raise typer.Exit(1)

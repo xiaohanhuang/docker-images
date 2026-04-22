@@ -27,7 +27,7 @@ from cli.commands import (
 
 
 def load_config():
-    config_path = os.path.expanduser("~/.ml-plat/config.yaml")
+    config_path = os.path.expanduser("~/.mlp/config.yaml")
     if os.path.exists(config_path):
         import yaml
 
@@ -72,12 +72,12 @@ def load_config():
 
 
 # Use the actual binary name so --install-completion registers the right
-# env var (_MLP_COMPLETE when invoked as mlp, _ML_PLAT_COMPLETE for ml-plat).
-_invoked_name = os.path.basename(sys.argv[0]) if sys.argv else "ml-plat"
+# env var (_MLP_COMPLETE when invoked as mlp).
+_invoked_name = os.path.basename(sys.argv[0]) if sys.argv else "mlp"
 # Normalise: strip .py / .exe suffixes and default if empty
 if "." in _invoked_name:
     _invoked_name = _invoked_name.rsplit(".", 1)[0]
-_cli_name = _invoked_name if _invoked_name in ("mlp", "ml-plat") else "ml-plat"
+_cli_name = _invoked_name if _invoked_name == "mlp" else "mlp"
 
 app = typer.Typer(
     name=_cli_name,
@@ -91,7 +91,7 @@ def _startup(ctx: typer.Context):
     load_config()
 
 
-# Register the wizard as a top-level command (ml-plat wizard)
+# Register the wizard as a top-level command (mlp wizard)
 @app.command("wizard")
 def _wizard_cmd():
     """Interactive onboarding wizard for new ML engineers."""

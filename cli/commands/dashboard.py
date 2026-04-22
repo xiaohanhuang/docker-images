@@ -13,7 +13,7 @@ def main(ctx: typer.Context):
     """Open the ML Platform Global Dashboard in your browser."""
     if ctx.invoked_subcommand is None:
         # Load the configuration to check if there is a dashboard URL configured
-        config_path = os.path.expanduser("~/.ml-plat/config.yaml")
+        config_path = os.path.expanduser("~/.mlp/config.yaml")
         dashboard_url = (
             "http://k8s-mlplatfo-mlplatfo-b0f5b5dde2-1200669602.us-west-2.elb.amazonaws.com"
         )

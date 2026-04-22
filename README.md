@@ -19,7 +19,7 @@ A production-grade ML training platform on AWS EKS, combining **Flyte** (orchest
 | [`projects/spark`](projects/spark/) | Spark-on-K8s operator + image | 4 |
 | [`projects/monitoring`](projects/monitoring/) | Prometheus, Grafana, MLflow, DCGM | 5 |
 | [`projects/components`](projects/components/) | Shared images, SDK, example workflows | 6 |
-| [`cli`](cli/) | Customer-facing `ml-plat` CLI | 7 |
+| [`cli`](cli/) | Customer-facing `mlp` CLI | 7 |
 
 ## Quick Start
 
@@ -48,7 +48,7 @@ export ML_PLAT_EXECUTION_URL=http://execution-service.ml-platform.internal
 export MLFLOW_TRACKING_URI=http://mlflow.ml-platform.internal
 
 # 7. Submit a training job
-ml-plat job submit --workflow workflows/llm_finetune
+mlp job submit --workflow workflows/llm_finetune
 ```
 
 **Or use the root Makefile**:

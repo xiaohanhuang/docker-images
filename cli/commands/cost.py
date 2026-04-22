@@ -2,9 +2,9 @@
 cost.py — Real-time cost tracking for GPU workloads.
 
 Commands:
-  ml-plat cost              — Show live cost for all running GPU pods
-  ml-plat cost summary      — Aggregated cost by user/namespace
-  ml-plat cost estimate     — Estimate cost for a hypothetical job
+  mlp cost              — Show live cost for all running GPU pods
+  mlp cost summary      — Aggregated cost by user/namespace
+  mlp cost estimate     — Estimate cost for a hypothetical job
 """
 
 import datetime
@@ -342,9 +342,9 @@ def show_cost(
     💰 Show real-time GPU costs for all running workloads.
 
     Examples:
-      ml-plat cost                      Show current costs
-      ml-plat cost -w                   Live-updating cost ticker
-      ml-plat cost -n ml-platform       Filter by namespace
+      mlp cost                      Show current costs
+      mlp cost -w                   Live-updating cost ticker
+      mlp cost -n ml-platform       Filter by namespace
     """
     # If a subcommand was invoked, skip this
     if ctx.invoked_subcommand is not None:
@@ -450,7 +450,7 @@ def cost_summary(
     📊 Show cost summary aggregated by user and workload type.
 
     Example:
-      ml-plat cost summary
+      mlp cost summary
     """
     v1, err = _load_kube()
     if err:
@@ -479,10 +479,10 @@ def cost_estimate(
     🧮 Estimate cost for a hypothetical GPU job.
 
     Examples:
-      ml-plat cost estimate                                  # 1x g5.xlarge for 1 hour
-      ml-plat cost estimate -i g5.12xlarge -t 8              # 4-GPU for 8 hours
-      ml-plat cost estimate -i p4d.24xlarge -t 24 -n 2       # Multi-node A100
-      ml-plat cost estimate -i g5.xlarge -t 4 --spot         # Spot pricing
+      mlp cost estimate                                  # 1x g5.xlarge for 1 hour
+      mlp cost estimate -i g5.12xlarge -t 8              # 4-GPU for 8 hours
+      mlp cost estimate -i p4d.24xlarge -t 24 -n 2       # Multi-node A100
+      mlp cost estimate -i g5.xlarge -t 4 --spot         # Spot pricing
     """
     info = INSTANCE_PRICING.get(instance)
     if not info:

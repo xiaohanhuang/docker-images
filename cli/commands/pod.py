@@ -421,7 +421,7 @@ def connect_pod(
                 pods = [p for p in data.get("pods", []) if p["status"] == "Running"]
                 if not pods:
                     console.print("[bold red]No running interactive pods found.[/bold red]")
-                    console.print("Launch one with: [cyan]ml-plat pod launch[/cyan]")
+                    console.print("Launch one with: [cyan]mlp pod launch[/cyan]")
                     raise typer.Exit(1)
                 if len(pods) == 1:
                     pod_name = pods[0]["name"]
@@ -580,10 +580,10 @@ def launch_pod(
     Use --gpu-type to target a specific GPU: t4 (g4dn), a10g (g5), or a100 (p4d/p4de).
 
     Examples:
-      ml-plat pod launch --shared-gpu                        # 1/4 GPU slice
-      ml-plat pod launch --gpu 1 --gpu-type t4             # NVIDIA T4 (g4dn)
-      ml-plat pod launch --gpu 1 --gpu-type a10g           # full A10G
-      ml-plat pod launch --gpu 8 --gpu-type a100           # 8x A100 (p4de)
+      mlp pod launch --shared-gpu                        # 1/4 GPU slice
+      mlp pod launch --gpu 1 --gpu-type t4             # NVIDIA T4 (g4dn)
+      mlp pod launch --gpu 1 --gpu-type a10g           # full A10G
+      mlp pod launch --gpu 8 --gpu-type a100           # 8x A100 (p4de)
     """
     _check_prerequisites()
 
@@ -696,6 +696,6 @@ def launch_pod(
             else:
                 console.print(
                     f"\n[bold green]Pod {pod_name} kept running.[/bold green]\n"
-                    f"Reconnect: [cyan]ml-plat pod connect {pod_name}[/cyan]\n"
+                    f"Reconnect: [cyan]mlp pod connect {pod_name}[/cyan]\n"
                     f"VS Code:   [dim]Cmd+Shift+P → Remote-SSH → {pod_name}[/dim]"
                 )

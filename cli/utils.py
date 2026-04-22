@@ -1,7 +1,7 @@
 """
-Shared utilities for the ml-plat CLI.
+Shared utilities for the mlp CLI.
 
-Platform configuration is loaded from ``~/.ml-plat/config.yaml``.  All
+Platform configuration is loaded from ``~/.mlp/config.yaml``.  All
 service endpoints (Flyte gRPC, PostgreSQL, Flyte Console, MLflow) are
 resolved from this file so no manual ``kubectl port-forward`` is needed.
 """
@@ -23,10 +23,10 @@ console = Console()
 
 
 def _load_platform_config() -> Dict[str, Any]:
-    """Read ``~/.ml-plat/config.yaml`` and return the raw dict (or ``{}``)."""
+    """Read ``~/.mlp/config.yaml`` and return the raw dict (or ``{}``)."""
     import yaml  # lazy – avoid import cost at CLI registration time
 
-    cfg_path = Path.home() / ".ml-plat" / "config.yaml"
+    cfg_path = Path.home() / ".mlp" / "config.yaml"
     if cfg_path.exists():
         with open(cfg_path) as fh:
             return yaml.safe_load(fh) or {}
@@ -46,7 +46,7 @@ def flyte_console_url(project: str, domain: str, execution_id: str) -> str:
 
     Resolution order:
     1. ``FLYTE_CONSOLE_URL`` env var
-    2. ``cluster.flyte_console_url`` in ``~/.ml-plat/config.yaml``
+    2. ``cluster.flyte_console_url`` in ``~/.mlp/config.yaml``
     3. Empty string (URL will be relative)
     """
     base = os.getenv("FLYTE_CONSOLE_URL", "").rstrip("/")
@@ -94,7 +94,7 @@ def flyte_remote() -> FlyteRemote:
 
     Resolution order for the gRPC endpoint:
     1. ``FLYTE_ENDPOINT`` env var
-    2. ``cluster.flyte_endpoint`` in ``~/.ml-plat/config.yaml``
+    2. ``cluster.flyte_endpoint`` in ``~/.mlp/config.yaml``
     3. ``~/.flyte/config.yaml`` (flytekit native config)
     4. Fall back to ``dns:///localhost:8089``
     """

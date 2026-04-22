@@ -20,7 +20,7 @@ def _api():
 
 
 # Endpoint resolution is handled by cli.utils.flyte_remote() which reads
-# from ~/.ml-plat/config.yaml and environment variables.
+# from ~/.mlp/config.yaml and environment variables.
 
 
 @app.command("history")
@@ -235,7 +235,7 @@ def _get_s3_bucket() -> str:
     """Return the platform S3 bucket from env."""
     bucket = os.getenv("S3_BUCKET")
     if not bucket:
-        console.print("[red]S3_BUCKET not set. Run [bold]ml-plat init[/bold] first.[/red]")
+        console.print("[red]S3_BUCKET not set. Run [bold]mlp init[/bold] first.[/red]")
         raise typer.Exit(1)
     return bucket
 
@@ -261,8 +261,8 @@ def profiles(
     Use --download to copy them to a local directory.
 
     Examples:
-        ml-plat job profiles abc-123
-        ml-plat job profiles abc-123 --download ./traces
+        mlp job profiles abc-123
+        mlp job profiles abc-123 --download ./traces
     """
     bucket = _get_s3_bucket()
     prefix = f"{S3_PROFILES_PREFIX}/{job_id}/"
@@ -316,7 +316,7 @@ def profiles(
         console.print(
             f"\n[dim]{len(files)} file(s), " f"{total_size / 1_000_000:.1f} MB total[/dim]"
         )
-        console.print(f"\n[dim]Download: ml-plat job profiles {job_id} --download ./traces[/dim]")
+        console.print(f"\n[dim]Download: mlp job profiles {job_id} --download ./traces[/dim]")
     else:
         # Download mode
         dest = os.path.abspath(download)

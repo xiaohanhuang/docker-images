@@ -1,7 +1,7 @@
-"""Recipe packager for bundling recipes into .ml-plat archives.
+"""Recipe packager for bundling recipes into .mlp archives.
 
 This module provides:
-- Bundling recipe YAML, lockfiles, and associated files into .ml-plat archives
+- Bundling recipe YAML, lockfiles, and associated files into .mlp archives
 - Archive validation and integrity checks
 - Support for hermetic, self-contained recipe distribution
 """
@@ -28,10 +28,10 @@ logger = logging.getLogger(__name__)
 
 
 class RecipePackager:
-    """Packager for bundling recipes into .ml-plat archives."""
+    """Packager for bundling recipes into .mlp archives."""
 
     MANIFEST_VERSION = "1.0"
-    ARCHIVE_EXTENSION = ".ml-plat"
+    ARCHIVE_EXTENSION = ".mlp"
 
     def __init__(self):
         """Initialize the recipe packager."""
@@ -46,11 +46,11 @@ class RecipePackager:
         profile: Optional[str] = None,
         component_versions: Optional[Dict[str, str]] = None,
     ) -> Path:
-        """Package a recipe into a .ml-plat archive.
+        """Package a recipe into a .mlp archive.
 
         The archive structure:
         ```
-        recipe-name-v1.0.0.ml-plat/
+        recipe-name-v1.0.0.mlp/
         ├── manifest.json           # Package metadata
         ├── recipe.yaml             # Recipe definition
         ├── lockfile.yaml           # Component versions (optional)
@@ -60,7 +60,7 @@ class RecipePackager:
 
         Args:
             recipe_name: Name of the recipe to package
-            output_path: Optional output path for archive (defaults to ./recipe-name-vX.Y.Z.ml-plat)
+            output_path: Optional output path for archive (defaults to ./recipe-name-vX.Y.Z.mlp)
             include_lockfile: Whether to include a lockfile
             profile: Infrastructure profile to use for lockfile
             component_versions: Optional component version overrides
@@ -133,10 +133,10 @@ class RecipePackager:
         archive_path: Path,
         output_dir: Optional[Path] = None,
     ) -> Path:
-        """Unpack a .ml-plat archive.
+        """Unpack a .mlp archive.
 
         Args:
-            archive_path: Path to .ml-plat archive
+            archive_path: Path to .mlp archive
             output_dir: Optional output directory (defaults to ./recipe-name/)
 
         Returns:
@@ -206,7 +206,7 @@ class RecipePackager:
         return output_dir
 
     def validate_archive(self, archive_path: Path) -> Dict[str, Any]:
-        """Validate a .ml-plat archive and return validation results.
+        """Validate a .mlp archive and return validation results.
 
         Args:
             archive_path: Path to archive
@@ -423,7 +423,7 @@ class RecipePackager:
         return profiles[0] if profiles else "default"
 
     def list_archive_contents(self, archive_path: Path) -> List[str]:
-        """List contents of a .ml-plat archive.
+        """List contents of a .mlp archive.
 
         Args:
             archive_path: Path to archive

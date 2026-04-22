@@ -2,13 +2,13 @@
 feature_store.py — CLI commands for the Feast Feature Store.
 
 Commands:
-  ml-plat feature-store init           — one-command setup (generate + apply + materialize)
-  ml-plat feature-store generate-data  — generate sample feature data
-  ml-plat feature-store apply          — apply feature definitions to the registry
-  ml-plat feature-store list           — list registered feature views
-  ml-plat feature-store materialize    — push features to the online store (Redis)
-  ml-plat feature-store get            — fetch feature values for entity keys
-  ml-plat feature-store status         — check health of the feature store stack
+  mlp feature-store init           — one-command setup (generate + apply + materialize)
+  mlp feature-store generate-data  — generate sample feature data
+  mlp feature-store apply          — apply feature definitions to the registry
+  mlp feature-store list           — list registered feature views
+  mlp feature-store materialize    — push features to the online store (Redis)
+  mlp feature-store get            — fetch feature values for entity keys
+  mlp feature-store status         — check health of the feature store stack
 """
 
 from __future__ import annotations
@@ -192,9 +192,9 @@ def init_store(
         _do_sync(repo, days=90, incremental=False)
 
     console.print("\n[green bold]Feature store is ready![/green bold]")
-    console.print("  List features:  ml-plat feature-store list")
+    console.print("  List features:  mlp feature-store list")
     if not sync:
-        console.print("  Sync to online:  ml-plat feature-store sync")
+        console.print("  Sync to online:  mlp feature-store sync")
 
 
 # ── apply ─────────────────────────────────────────────────────────────
@@ -270,8 +270,7 @@ def list_features(
 
     if not views and not on_demand:
         console.print(
-            "[yellow]No feature views registered."
-            " Run 'ml-plat feature-store apply' first.[/yellow]"
+            "[yellow]No feature views registered." " Run 'mlp feature-store apply' first.[/yellow]"
         )
         raise typer.Exit(code=0)
 
@@ -468,7 +467,7 @@ def get_features(
     except Exception as e:
         console.print(
             f"[red]Failed to fetch features:[/red] {e}\n"
-            "[yellow]Have you run 'ml-plat feature-store materialize' first?[/yellow]"
+            "[yellow]Have you run 'mlp feature-store materialize' first?[/yellow]"
         )
         raise typer.Exit(code=1)
 

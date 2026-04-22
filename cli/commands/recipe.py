@@ -1,17 +1,17 @@
 """CLI commands for the Recipe system.
 
 Commands:
-    ml-plat recipe list                          — list recipes in registry
-    ml-plat recipe list --local                  — list local recipes
-    ml-plat recipe info <name> [--version] [--local]
+    mlp recipe list                          — list recipes in registry
+    mlp recipe list --local                  — list local recipes
+    mlp recipe info <name> [--version] [--local]
                                                  — show recipe details
-    ml-plat recipe validate <name>               — validate recipe YAML
-    ml-plat recipe run <name> [--version] [--preset] [--param] [--dry-run]
+    mlp recipe validate <name>               — validate recipe YAML
+    mlp recipe run <name> [--version] [--preset] [--param] [--dry-run]
                                                  — execute (or dry-run) a recipe
-    ml-plat recipe versions <name>               — list all versions of a recipe
-    ml-plat recipe register <name>               — register recipe components
-    ml-plat recipe push <name>                   — push recipe to registry
-    ml-plat recipe pull <name> [--version]       — pull recipe from registry
+    mlp recipe versions <name>               — list all versions of a recipe
+    mlp recipe register <name>               — register recipe components
+    mlp recipe push <name>                   — push recipe to registry
+    mlp recipe pull <name> [--version]       — pull recipe from registry
 """
 
 from __future__ import annotations
@@ -70,10 +70,10 @@ def list_recipes(
     Use --local to scan the local recipes directory instead.
 
     Examples:
-      ml-plat recipe list
-      ml-plat recipe list --status verified
-      ml-plat recipe list --tag gpu
-      ml-plat recipe list --local
+      mlp recipe list
+      mlp recipe list --status verified
+      mlp recipe list --tag gpu
+      mlp recipe list --local
     """
     if local:
         _list_local_recipes(recipes_dir)
@@ -131,7 +131,7 @@ def _list_local_recipes(recipes_dir: str) -> None:
     console.print(table)
     console.print(
         f"\n[dim]Total: {len(recipes)} recipe(s). "
-        "Run [bold]ml-plat recipe info <name>[/bold] for details.[/dim]\n"
+        "Run [bold]mlp recipe info <name>[/bold] for details.[/dim]\n"
     )
 
 
@@ -156,7 +156,7 @@ def _list_remote_recipes(tags: Optional[List[str]], verification_status: Optiona
     if not recipes:
         console.print("[dim]No recipes found in the registry.[/dim]")
         console.print(
-            "[dim]Push a recipe with [bold]ml-plat recipe push <name>[/bold] "
+            "[dim]Push a recipe with [bold]mlp recipe push <name>[/bold] "
             "or use [bold]--local[/bold] to see local recipes.[/dim]"
         )
         raise typer.Exit(0)
@@ -212,7 +212,7 @@ def _list_remote_recipes(tags: Optional[List[str]], verification_status: Optiona
     console.print(table)
     console.print(
         f"\n[dim]Total: {len(recipes)} recipe(s) in registry. "
-        "Run [bold]ml-plat recipe pull <name>[/bold] to download.[/dim]\n"
+        "Run [bold]mlp recipe pull <name>[/bold] to download.[/dim]\n"
     )
 
 
@@ -249,9 +249,9 @@ def recipe_info(
     recipe.  Use ``--local`` to inspect a recipe on disk before pushing.
 
     Examples:\n
-      ml-plat recipe info openrlhf-llm-rlhf\n
-      ml-plat recipe info openrlhf-llm-rlhf --version 1.0\n
-      ml-plat recipe info test-recipe --local\n
+      mlp recipe info openrlhf-llm-rlhf\n
+      mlp recipe info openrlhf-llm-rlhf --version 1.0\n
+      mlp recipe info test-recipe --local\n
     """
     import tempfile
 
@@ -291,7 +291,7 @@ def recipe_info(
             console.print(f"[bold red]Recipe not found in registry:[/bold red] {exc}")
             console.print(
                 "[dim]Use --local to inspect a local recipe, or run "
-                "'ml-plat recipe list' to see available recipes.[/dim]"
+                "'mlp recipe list' to see available recipes.[/dim]"
             )
             raise typer.Exit(1)
         except Exception as exc:
@@ -392,8 +392,8 @@ def list_recipe_versions(
     """📋 List all published versions of a recipe in the registry.
 
     Examples:\n
-      ml-plat recipe versions openrlhf-llm-rlhf\n
-      ml-plat recipe versions text2sql\n
+      mlp recipe versions openrlhf-llm-rlhf\n
+      mlp recipe versions text2sql\n
     """
     from cli.recipe_engine.registry_client import RegistryClient
 
@@ -411,7 +411,7 @@ def list_recipe_versions(
 
     if not versions:
         console.print(f"[dim]No versions found for recipe '{name}'.[/dim]")
-        console.print("[dim]Run 'ml-plat recipe list' to see available recipes.[/dim]")
+        console.print("[dim]Run 'mlp recipe list' to see available recipes.[/dim]")
         raise typer.Exit(0)
 
     table = Table(
@@ -445,7 +445,7 @@ def list_recipe_versions(
 
     console.print(table)
     console.print(
-        f"\nRun [cyan]ml-plat recipe run {name} --version <ver>[/cyan] "
+        f"\nRun [cyan]mlp recipe run {name} --version <ver>[/cyan] "
         "to execute a specific version."
     )
 
@@ -475,8 +475,8 @@ def validate_recipe(
     - Invalid template syntax
 
     Examples:
-      ml-plat recipe validate test-recipe
-      ml-plat recipe validate my-recipe --dir /custom/recipes
+      mlp recipe validate test-recipe
+      mlp recipe validate my-recipe --dir /custom/recipes
     """
     from cli.recipe_engine.parser import RecipeParser
 
@@ -643,17 +643,17 @@ def run_recipe(
 
         Examples:\n
           # Run a local recipe\n
-          ml-plat recipe run text2sql\n
+          mlp recipe run text2sql\n
     \n
           # Run a specific version from the registry\n
-          ml-plat recipe run openrlhf-llm-rlhf --version 1.0\n
-          ml-plat recipe run openrlhf-llm-rlhf --version latest --preset small\n
+          mlp recipe run openrlhf-llm-rlhf --version 1.0\n
+          mlp recipe run openrlhf-llm-rlhf --version latest --preset small\n
     \n
           # Override individual parameters\n
-          ml-plat recipe run text2sql --param num_epochs=5 --param batch_size=32\n
+          mlp recipe run text2sql --param num_epochs=5 --param batch_size=32\n
     \n
           # Dry-run to see resolved config\n
-          ml-plat recipe run text2sql --preset production --dry-run\n
+          mlp recipe run text2sql --preset production --dry-run\n
     """
     import tempfile
 
@@ -689,7 +689,7 @@ def run_recipe(
             )
         except ValueError as exc:
             console.print(f"[bold red]Recipe not found in registry:[/bold red] {exc}")
-            console.print("[dim]Run 'ml-plat recipe list' to see available recipes.[/dim]")
+            console.print("[dim]Run 'mlp recipe list' to see available recipes.[/dim]")
             raise typer.Exit(1)
         except Exception as exc:
             console.print(f"[bold red]Failed to pull recipe:[/bold red] {exc}")
@@ -899,7 +899,7 @@ def run_recipe(
         remote = flyte_remote()
     except Exception as exc:
         console.print(f"[bold red]Failed to connect to Flyte:[/bold red] {exc}")
-        console.print("[dim]Check cluster.flyte_endpoint in ~/.ml-plat/config.yaml[/dim]")
+        console.print("[dim]Check cluster.flyte_endpoint in ~/.mlp/config.yaml[/dim]")
         raise typer.Exit(1)
 
     def on_submit(exec_info: dict):
@@ -1034,14 +1034,14 @@ def push_recipe(
     """📤 Package and push a recipe to the registry.
 
     This command:
-    1. Packages the recipe into a .ml-plat archive
+    1. Packages the recipe into a .mlp archive
     2. Uploads it to S3
     3. Stores metadata in PostgreSQL
 
     Examples:
-      ml-plat recipe push text2sql
-      ml-plat recipe push llm-rlhf --profile small --status verified
-      ml-plat recipe push my-recipe --tag production --tag gpu
+      mlp recipe push text2sql
+      mlp recipe push llm-rlhf --profile small --status verified
+      mlp recipe push my-recipe --tag production --tag gpu
     """
     from cli.recipe_engine.packager import RecipePackager
     from cli.recipe_engine.parser import RecipeParser
@@ -1149,9 +1149,9 @@ def pull_recipe(
     Downloads a recipe archive from S3.
 
     Examples:
-      ml-plat recipe pull text2sql
-      ml-plat recipe pull llm-rlhf --version 1.2.0
-      ml-plat recipe pull my-recipe --unpack
+      mlp recipe pull text2sql
+      mlp recipe pull llm-rlhf --version 1.2.0
+      mlp recipe pull my-recipe --unpack
     """
     console.print(f"Pulling recipe: [cyan]{name}[/cyan] version [yellow]{version}[/yellow]")
 
@@ -1188,7 +1188,7 @@ def pull_recipe(
 
     except ValueError as exc:
         console.print(f"[bold red]Recipe not found:[/bold red] {exc}")
-        console.print("[dim]Run 'ml-plat recipe list' to see available recipes.[/dim]")
+        console.print("[dim]Run 'mlp recipe list' to see available recipes.[/dim]")
         raise typer.Exit(1)
     except Exception as exc:
         console.print(f"[bold red]Failed to pull from registry:[/bold red] {exc}")
@@ -1237,8 +1237,8 @@ def register_recipe(
     with its pinned version via ``pyflyte register``.
 
     Examples:\n
-      ml-plat recipe register openrlhf-llm-rlhf\n
-      ml-plat recipe register openrlhf-llm-rlhf --project ml-platform\n
+      mlp recipe register openrlhf-llm-rlhf\n
+      mlp recipe register openrlhf-llm-rlhf --project ml-platform\n
     """
     from cli.recipe_engine.parser import RecipeParser
     from cli.recipe_engine.registrar import ComponentRegistrar

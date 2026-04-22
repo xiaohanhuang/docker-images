@@ -63,7 +63,7 @@ class RecipeParser:
                     f"Recipe not found: {recipe_name}\n"
                     f"Searched: {self.recipes_dir / recipe_name / 'recipe.yaml'} "
                     f"and {self.recipes_dir / recipe_name}.yaml\n"
-                    f"Run 'ml-plat recipe list' to see available recipes."
+                    f"Run 'mlp recipe list' to see available recipes."
                 )
         return recipe_path
 

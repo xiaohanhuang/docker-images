@@ -68,17 +68,17 @@ All images live in ECR: 805673386114.dkr.ecr.us-west-2.amazonaws.com/ml-platform
     embeddings_path, backend="pgvector"|"faiss"|"chromadb")
 - components/training/, components/evaluation/, components/serving/
 
-== CLI Commands (ml-plat) ==
-- ml-plat init              — initial config (~/.ml-plat/config.yaml)
-- ml-plat job submit        — submit Flyte workflow
-- ml-plat job status        — check job status
-- ml-plat job logs          — stream logs
-- ml-plat pod launch        — launch GPU pod for interactive work
-- ml-plat pod connect       — SSH into running pod
-- ml-plat notebook open     — open JupyterHub
-- ml-plat debug start       — start GPU debug pod
-- ml-plat cost estimate     — estimate job cost
-- ml-plat wizard            — this wizard
+== CLI Commands (mlp) ==
+- mlp init              — initial config (~/.mlp/config.yaml)
+- mlp job submit        — submit Flyte workflow
+- mlp job status        — check job status
+- mlp job logs          — stream logs
+- mlp pod launch        — launch GPU pod for interactive work
+- mlp pod connect       — SSH into running pod
+- mlp notebook open     — open JupyterHub
+- mlp debug start       — start GPU debug pod
+- mlp cost estimate     — estimate job cost
+- mlp wizard            — this wizard
 
 == Code Conventions ==
 1. Lazy imports: Heavy deps (torch, mlflow, boto3) imported INSIDE task bodies
@@ -177,7 +177,7 @@ def _write_files(project_dir: Path, files: dict[str, str]):
         existing = gitignore.read_text()
         if entry not in existing.splitlines():
             with gitignore.open("a") as f:
-                f.write(f"\n# ml-plat generated project\n{entry}\n")
+                f.write(f"\n# mlp generated project\n{entry}\n")
 
 
 def generate_llm_finetune_project(project_name: str, base_dir: Path) -> Path:
@@ -393,7 +393,7 @@ def generate_llm_finetune_project(project_name: str, base_dir: Path) -> Path:
             """Production LLM fine-tuning pipeline.
 
             Submit:
-                ml-plat job submit \\
+                mlp job submit \\
                     --workflow-name {{PROJECT_NAME}}.workflow.llm_finetune_pipeline
             """
             validated = validate_dataset(s3_path=dataset)
@@ -423,14 +423,14 @@ def generate_llm_finetune_project(project_name: str, base_dir: Path) -> Path:
 
         ```bash
         # 1. Register the workflow
-        ml-plat job register --source-dir . --project my-team --domain development
+        mlp job register --source-dir . --project my-team --domain development
 
         # 2. Submit a training job
-        ml-plat job submit --workflow-name {project_name}.workflow.llm_finetune_pipeline
+        mlp job submit --workflow-name {project_name}.workflow.llm_finetune_pipeline
 
         # 3. Monitor
-        ml-plat job status --job-id <execution-id>
-        ml-plat job logs --job-id <execution-id>
+        mlp job status --job-id <execution-id>
+        mlp job logs --job-id <execution-id>
         ```
 
         ## Platform Resources
@@ -588,7 +588,7 @@ def generate_rag_pipeline_project(project_name: str, base_dir: Path) -> Path:
             """RAG indexing: chunk → embed → index.
 
             Submit:
-                ml-plat job submit \\
+                mlp job submit \\
                     --workflow-name {{PROJECT_NAME}}.workflow.rag_indexing_pipeline
             """
             chunks_path, _ = chunk_documents(
@@ -616,8 +616,8 @@ def generate_rag_pipeline_project(project_name: str, base_dir: Path) -> Path:
         ## Quick Start
 
         ```bash
-        ml-plat job register --source-dir . --project my-team --domain development
-        ml-plat job submit --workflow-name {project_name}.workflow.rag_indexing_pipeline
+        mlp job register --source-dir . --project my-team --domain development
+        mlp job submit --workflow-name {project_name}.workflow.rag_indexing_pipeline
         ```
 
         ## Platform Resources
@@ -768,7 +768,7 @@ def generate_distributed_training_project(project_name: str, base_dir: Path) -> 
             """Distributed training pipeline.
 
             Submit:
-                ml-plat job submit \\
+                mlp job submit \\
                     --workflow-name {{PROJECT_NAME}}.workflow.training_pipeline
             """
             data_path = prepare_data(s3_path=dataset)
@@ -789,8 +789,8 @@ def generate_distributed_training_project(project_name: str, base_dir: Path) -> 
         ## Quick Start
 
         ```bash
-        ml-plat job register --source-dir . --project my-team --domain development
-        ml-plat job submit --workflow-name {project_name}.workflow.training_pipeline
+        mlp job register --source-dir . --project my-team --domain development
+        mlp job submit --workflow-name {project_name}.workflow.training_pipeline
         ```
 
         ## Platform Resources
@@ -881,7 +881,7 @@ def generate_spark_etl_project(project_name: str, base_dir: Path) -> Path:
             """Spark ETL pipeline.
 
             Submit:
-                ml-plat job submit \\
+                mlp job submit \\
                     --workflow-name {{PROJECT_NAME}}.workflow.etl_pipeline
             """
             cleaned = extract_and_clean(raw_data_path=raw_data, output_path=cleaned_output)
@@ -899,8 +899,8 @@ def generate_spark_etl_project(project_name: str, base_dir: Path) -> Path:
         ## Quick Start
 
         ```bash
-        ml-plat job register --source-dir . --project my-team --domain development
-        ml-plat job submit --workflow-name {project_name}.workflow.etl_pipeline
+        mlp job register --source-dir . --project my-team --domain development
+        mlp job submit --workflow-name {project_name}.workflow.etl_pipeline
         ```
 
         ## Platform Resources
@@ -1020,11 +1020,11 @@ def generate_notebook_project(project_name: str, base_dir: Path) -> Path:
 
         ```bash
         # Launch JupyterHub (opens in browser)
-        ml-plat notebook open
+        mlp notebook open
 
         # Or launch a standalone GPU pod for interactive work
-        ml-plat pod launch --gpu 1 --image ml-gpu
-        ml-plat pod connect <pod-name>
+        mlp pod launch --gpu 1 --image ml-gpu
+        mlp pod connect <pod-name>
         ```
 
         ## Available Notebook Profiles
@@ -1247,7 +1247,7 @@ def detect_intent(text: str) -> tuple:
 
 def _load_config() -> tuple[dict, dict]:
     """Return (cluster_cfg, ecr_cfg), falling back to empty dicts if missing."""
-    config_path = os.path.expanduser("~/.ml-plat/config.yaml")
+    config_path = os.path.expanduser("~/.mlp/config.yaml")
     if not os.path.exists(config_path):
         return {}, {}
     with open(config_path) as f:
@@ -1300,7 +1300,7 @@ def wizard():
     if unknown_cmd:
         console.print(
             Panel(
-                f"[yellow]You tried: [bold]ml-plat {unknown_cmd}[/bold][/yellow]\n\n"
+                f"[yellow]You tried: [bold]mlp {unknown_cmd}[/bold][/yellow]\n\n"
                 "That's not a recognised command — here's what you probably want:",
                 title="🤖 ML Platform Assistant",
                 border_style="yellow",
@@ -1309,14 +1309,14 @@ def wizard():
         cluster, ecr = _load_config()
         assistant = BedrockAssistant(region=ecr.get("region", "us-west-2"))
         question = (
-            f"The user tried to run: ml-plat {unknown_cmd}\n"
+            f"The user tried to run: mlp {unknown_cmd}\n"
             "This command does not exist. In 2-3 sentences, tell them the correct "
-            "ml-plat command(s) to achieve what they were trying to do, with examples."
+            "mlp command(s) to achieve what they were trying to do, with examples."
         )
         console.print("[dim]...[/dim]")
         answer = assistant.ask(question)
         console.print(Markdown(answer))
-        context = f"The user tried to run: ml-plat {unknown_cmd}"
+        context = f"The user tried to run: mlp {unknown_cmd}"
         _qa_loop(assistant, context)
         return
 
@@ -1332,7 +1332,7 @@ def wizard():
     )
 
     # ── Step 1: Config ───────────────────────────────────────────────────
-    config_path = os.path.expanduser("~/.ml-plat/config.yaml")
+    config_path = os.path.expanduser("~/.mlp/config.yaml")
 
     if not os.path.exists(config_path):
         console.print("\n[yellow]Looks like you haven't set up the CLI yet.[/yellow]")
@@ -1341,7 +1341,7 @@ def wizard():
 
             init()
         else:
-            console.print("[dim]Run 'ml-plat init' and come back anytime.[/dim]")
+            console.print("[dim]Run 'mlp init' and come back anytime.[/dim]")
             raise typer.Exit(1)
 
     cluster, ecr = _load_config()
@@ -1429,11 +1429,11 @@ def wizard():
                 Open [bold]workflow.py[/bold], fill in your data path and model name,
                 then run:
 
-                   [dim]ml-plat job submit --project-dir {project_name}[/dim]
+                   [dim]mlp job submit --project-dir {project_name}[/dim]
 
                 To check on it:
-                   [dim]ml-plat job status --job-id <id>[/dim]
-                   [dim]ml-plat job logs   --job-id <id>[/dim]
+                   [dim]mlp job status --job-id <id>[/dim]
+                   [dim]mlp job logs   --job-id <id>[/dim]
             """),
             border_style="green",
         )

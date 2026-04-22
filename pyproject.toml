@@ -87,7 +87,6 @@ all = [
 ]
 
 [project.scripts]
-ml-plat = "cli.main:main"
 mlp = "cli.main:main"
 
 [build-system]

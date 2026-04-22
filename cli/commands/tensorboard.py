@@ -75,7 +75,7 @@ def list_runs(
 
     bucket = bucket or os.environ.get("S3_BUCKET")
     if not bucket:
-        console.print("[bold red]S3_BUCKET not set. Pass --bucket or run ml-plat init.[/bold red]")
+        console.print("[bold red]S3_BUCKET not set. Pass --bucket or run mlp init.[/bold red]")
         raise typer.Exit(1)
 
     try:

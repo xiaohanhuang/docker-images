@@ -789,10 +789,10 @@ class RecipeRunner:
             wf_version = f"v{recipe.version}-{profile}"
 
             exec_labels = {
-                "ml-plat-recipe": recipe_name,
-                "ml-plat-version": recipe.version,
-                "ml-plat-profile": profile,
-                "ml-plat-preset": preset_name or "default",
+                "mlp-recipe": recipe_name,
+                "mlp-version": recipe.version,
+                "mlp-profile": profile,
+                "mlp-preset": preset_name or "default",
             }
 
             execute_kwargs = {
@@ -840,14 +840,14 @@ class RecipeRunner:
             # NOTE: Architecture resources are NOT torn down here because
             # the Flyte execution runs asynchronously (wait=False). Tearing
             # down services now would break running tasks that depend on them.
-            # Use `ml-plat recipe teardown <name>` after the execution
+            # Use `mlp recipe teardown <name>` after the execution
             # reaches a terminal phase, or set auto_teardown=True to poll.
             if deployer and auto_teardown:
                 self._wait_and_teardown(deployer, executions, remote, proj, dom)
             elif deployer:
                 logger.info(
                     "Architecture resources left running. "
-                    "Run 'ml-plat recipe teardown %s' when the execution completes.",
+                    "Run 'mlp recipe teardown %s' when the execution completes.",
                     recipe_name,
                 )
 

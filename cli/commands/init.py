@@ -18,9 +18,9 @@ def init(
     ),
 ):
     """
-    Initialize the ml-plat CLI by reading Terraform outputs and generating config.
+    Initialize the mlp CLI by reading Terraform outputs and generating config.
     """
-    config_dir = os.path.expanduser("~/.ml-plat")
+    config_dir = os.path.expanduser("~/.mlp")
     config_path = os.path.join(config_dir, "config.yaml")
 
     os.makedirs(config_dir, exist_ok=True)
