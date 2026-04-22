@@ -11,7 +11,7 @@ from rich.table import Table
 from cli.gpu_types import GpuType
 
 console = Console()
-app = typer.Typer(help="Manage interactive GPU pods")
+app = typer.Typer(help="Manage interactive pods")
 
 
 def _api():

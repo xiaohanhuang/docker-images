@@ -29,7 +29,7 @@ from cli.recipe_engine.schema import Architecture
 logger = logging.getLogger(__name__)
 
 # Labels applied to all resources for easy cleanup
-_MANAGED_BY = "mlp-recipe-engine"
+_MANAGED_BY = "ml-plat-recipe-engine"
 
 
 class DeploymentError(Exception):

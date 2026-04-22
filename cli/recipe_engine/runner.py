@@ -789,10 +789,10 @@ class RecipeRunner:
             wf_version = f"v{recipe.version}-{profile}"
 
             exec_labels = {
-                "mlp-recipe": recipe_name,
-                "mlp-version": recipe.version,
-                "mlp-profile": profile,
-                "mlp-preset": preset_name or "default",
+                "ml-plat-recipe": recipe_name,
+                "ml-plat-version": recipe.version,
+                "ml-plat-profile": profile,
+                "ml-plat-preset": preset_name or "default",
             }
 
             execute_kwargs = {
