@@ -13,19 +13,15 @@ import torch
 
 S3_PROFILES_PREFIX = "profiles"
 
-# Default data bucket for the ML Platform EKS cluster.  Override via
-# S3_BUCKET or ML_PLATFORM_DATA_BUCKET environment variables.
-_DEFAULT_DATA_BUCKET = "ml-platform-data-ml-platform-eks-805673386114"
-
 
 def _upload_to_s3(local_dir: str) -> str | None:
     """Upload profiling traces from *local_dir* to S3.
 
-    Reads ``S3_BUCKET`` (or ``ML_PLATFORM_DATA_BUCKET``) from the environment.
+    Reads ``S3_BUCKET`` from the environment (set by ``ml-plat init``).
     Returns the S3 URI on success, or ``None`` if the bucket is not configured
     or the upload fails.
     """
-    bucket = os.getenv("S3_BUCKET") or os.getenv("ML_PLATFORM_DATA_BUCKET", _DEFAULT_DATA_BUCKET)
+    bucket = os.getenv("S3_BUCKET")
     if not bucket:
         return None
 

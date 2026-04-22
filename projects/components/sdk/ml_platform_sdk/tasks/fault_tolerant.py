@@ -540,9 +540,7 @@ def fault_tolerant_ray_task(
             containers=[
                 V1Container(
                     name="ray-worker",
-                    volume_mounts=[
-                        V1VolumeMount(name=EFS_VOLUME_NAME, mount_path=EFS_MOUNT_PATH)
-                    ],
+                    volume_mounts=[V1VolumeMount(name=EFS_VOLUME_NAME, mount_path=EFS_MOUNT_PATH)],
                     env=worker_env_vars,
                     resources=V1ResourceRequirements(
                         requests=resource_requests,
