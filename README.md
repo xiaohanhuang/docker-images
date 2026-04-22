@@ -76,4 +76,4 @@ The pre-push hook blocks the push and prints the fix command if any check fails:
 
 ## Architecture
 
-See [`docs/architecture/architecture.md`](docs/architecture/architecture.md) for the full architecture design, including comparisons with OpenConnect, Metaflow, and Michelangelo.
+See [`docs/architecture/architecture.md`](docs/architecture/architecture.md) for the full architecture design.

@@ -11,7 +11,7 @@ from rich.table import Table
 from cli.gpu_types import GpuType
 
 console = Console()
-app = typer.Typer(help="Manage RunPod-style interactive GPU pods")
+app = typer.Typer(help="Manage interactive GPU pods")
 
 
 def _api():
@@ -573,7 +573,7 @@ def launch_pod(
     timeout: int = typer.Option(600, help="Timeout in seconds to wait for pod to be ready"),
 ):
     """
-    Launch a RunPod-style interactive GPU pod with EFS storage and automatic access.
+    Launch an interactive GPU pod with EFS storage and automatic access.
 
     Use --shared-gpu to land on the time-sliced shared GPU nodepool (1/4 GPU slice).
     Use --gpu N to request N GPUs on a dedicated GPU node.
